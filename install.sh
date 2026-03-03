@@ -73,9 +73,33 @@ cp "$SOURCE_DIR/agents/web-seo-technical.md"   "$AGENT_DIR/web-seo-technical.md"
 cp "$SOURCE_DIR/agents/web-seo-performance.md" "$AGENT_DIR/web-seo-performance.md"
 cp "$SOURCE_DIR/agents/web-seo-nextjs.md"      "$AGENT_DIR/web-seo-nextjs.md"
 
+# ─── Verify installation ─────────────────────────────────────────────
+info "Verifying installation..."
+VERIFY_FAILED=0
+for f in \
+    "$SKILL_DIR/SKILL.md" \
+    "$SKILL_DIR/references/quality-gates.md" \
+    "$SKILL_DIR/references/cwv-thresholds.md" \
+    "$SKILL_DIR/references/nextjs-patterns.md" \
+    "$SKILL_DIR/references/schema-types.md" \
+    "$AGENT_DIR/web-seo-technical.md" \
+    "$AGENT_DIR/web-seo-performance.md" \
+    "$AGENT_DIR/web-seo-nextjs.md"; do
+    if [[ ! -r "$f" ]]; then
+        error "Verification failed: $f is missing or not readable"
+        VERIFY_FAILED=1
+    fi
+done
+
+if [[ $VERIFY_FAILED -eq 1 ]]; then
+    error "Installation verification failed. Some files may not have been copied correctly."
+    error "Try running the installer again, or install manually."
+    exit 1
+fi
+
 # ─── Done ─────────────────────────────────────────────────────────────
 printf "\n"
-success "Installed successfully!"
+success "Installed and verified successfully!"
 printf "\n"
 printf "  ${BOLD}Installed files:${RESET}\n"
 printf "  ${DIM}Skill${RESET}   %s/SKILL.md\n" "$SKILL_DIR"

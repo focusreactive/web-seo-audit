@@ -152,10 +152,31 @@ Every issue MUST follow this structure:
 
 ```
 category_score = max(0, 100 - sum(deductions))
-overall_score = sum(category_score * category_weight)
+overall_score = round(sum(category_score * category_weight))
 ```
 
 When calculating, apply deduction caps for MEDIUM and LOW issues per category, not globally.
+
+### Rounding
+
+- Category scores are always integers (round half-up: 79.5 → 80)
+- Overall score is rounded to the nearest integer after applying weights
+- Grade and status thresholds apply to the rounded overall score
+
+### Cross-Category Deduplication
+
+When the same issue appears in multiple categories (e.g., an image without alt text could be both Image Optimization and Meta & Structured Data):
+
+1. **Count the deduction in only one category** — the category that owns the issue per the agent boundary rules
+2. **Ownership priority**: Image issues → Image Optimization. Meta tag issues → Meta & Structured Data. Framework-specific issues → Next.js Patterns. If ambiguous, assign to the category where the issue has the higher priority level.
+3. **Still mention the issue** in the other category's report for context, but mark it as "(scored under {owning category})" and do not deduct points for it there.
+
+### Incomplete Categories
+
+When a category has no data (agent failure or not applicable):
+- Exclude the category from the overall score calculation
+- Redistribute its weight proportionally across remaining categories
+- Example: If Next.js Patterns (20%) is unavailable, redistribute as: Technical SEO 31.25%, Performance 31.25%, Meta & Structured Data 25%, Image Optimization 12.5%
 
 ## Report Summary Format
 

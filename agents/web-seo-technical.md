@@ -14,28 +14,33 @@ You are responsible for two scoring categories:
 1. **Technical SEO** — Crawlability, indexability, URL structure, security, internal linking, mobile optimization, internationalization
 2. **Meta & Structured Data** — Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD structured data
 
+**Boundary**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema).
+
+## Path Convention
+
+The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src/`, `packages/web/`, or empty for root-level). **Prepend this prefix to all path patterns** in your analysis. For example:
+- If sourceRoot is `src/`: use `src/app/**/*.tsx`, `src/components/**/*.tsx`
+- If sourceRoot is empty: use `app/**/*.tsx`, `components/**/*.tsx`
+
+In this document, paths are written without prefix for readability. Always apply the sourceRoot prefix when running actual glob/grep commands.
+
 ## Analysis Protocol
 
 ### Step 1: Project Discovery
 
-Identify the project type and structure:
+Use the framework information provided by the orchestrator. Additionally, check for SEO-specific configuration:
 
 ```
-# Check for framework
-glob: package.json
-grep: "next|react|vue|nuxt|gatsby|astro|svelte" package.json
-
-# Identify HTML entry points
-glob: **/*.html
-glob: public/**/*.html
-glob: src/**/*.{tsx,jsx,vue,svelte,astro}
-
 # Check for existing SEO configuration
 glob: **/robots.txt
 glob: **/sitemap*.xml
 glob: **/.htaccess
 glob: **/next.config.{js,mjs,ts}
 glob: **/next-sitemap.config.{js,mjs,ts}
+
+# Identify HTML entry points
+glob: **/*.html
+glob: public/**/*.html
 ```
 
 ### Step 2: Crawlability & Indexability Checks
@@ -97,7 +102,7 @@ Run these checks in order:
 
 ### Step 4: Structured Data Analysis
 
-Read the reference file at `~/.claude/skills/web-seo-audit/references/schema-types.md` for detailed validation rules.
+Use the schema-types reference provided by the orchestrator in your agent prompt for detailed validation rules. If no reference was provided, apply general schema.org best practices.
 
 **Detection**
 - `grep "application/ld.json|@context.*schema.org" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
@@ -139,7 +144,7 @@ Check configuration files for security-relevant settings:
 - Verify viewport meta tag
 - Check for fixed-width layouts: `grep "width:\s*\d+px" styles/**/*.css **/*.{tsx,jsx}`
 - Check for tap target sizing in CSS
-- Verify responsive images (srcset or `next/image`)
+- Note: Responsive image checks (srcset, next/image) are handled by the `web-seo-performance` agent under Image Optimization. Do NOT duplicate those checks here.
 
 ### Step 8: Internationalization (if applicable)
 
@@ -150,7 +155,7 @@ Check configuration files for security-relevant settings:
 
 ## Output Format
 
-Return findings as a structured list of issues following the format defined in `~/.claude/skills/web-seo-audit/references/quality-gates.md`.
+Return findings as a structured list of issues following the quality-gates format provided by the orchestrator in your agent prompt.
 
 Group issues under two categories:
 1. **Technical SEO Issues**
