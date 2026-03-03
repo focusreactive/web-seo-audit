@@ -1,6 +1,6 @@
 {
   "name": "web-seo-audit",
-  "description": "Scan web projects for SEO issues. Get a scored report with 5 categories, Core Web Vitals risk assessment, and actionable fixes. Supports Next.js (App Router & Pages Router) with specialized checks.",
+  "description": "Scan web projects for SEO issues. Get a scored report with 6 categories including AI search readiness, Core Web Vitals risk assessment, and actionable fixes. Supports Next.js (App Router & Pages Router) with specialized checks.",
   "version": "1.0.0",
   "author": {
     "name": "Focus Reactive",
@@ -9,5 +9,5 @@
   "homepage": "https://github.com/focusreactive/web-seo-audit",
   "repository": "https://github.com/focusreactive/web-seo-audit",
   "license": "MIT",
-  "keywords": ["seo", "web-performance", "core-web-vitals", "nextjs", "audit"]
+  "keywords": ["seo", "web-performance", "core-web-vitals", "nextjs", "audit", "aeo", "ai-search", "llms-txt"]
 }

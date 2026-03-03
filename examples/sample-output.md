@@ -13,7 +13,7 @@ This is an example of what `web-seo-audit` produces when run against a Next.js 1
 
 ---
 
-## SEO Health Score: 72/100 (C+) — WARNING
+## SEO Health Score: 71/100 (C) — WARNING
 
 | Category | Score | Status | Issues |
 |----------|-------|--------|--------|
@@ -22,6 +22,7 @@ This is an example of what `web-seo-audit` produces when run against a Next.js 1
 | Next.js Patterns | 70/100 | WARNING | 1C 0H 5M 2L |
 | Meta & Structured Data | 84/100 | PASS | 0C 2H 0M 0L |
 | Image Optimization | 62/100 | WARNING | 0C 2H 4M 1L |
+| AI Search Readiness | 55/100 | FAIL | 1C 1H 3M 2L |
 
 ---
 
@@ -35,7 +36,7 @@ This is an example of what `web-seo-audit` produces when run against a Next.js 1
 
 ---
 
-## Critical Issues (2)
+## Critical Issues (3)
 
 ### [CRITICAL] Performance: SPA-style rendering on product listing page
 
@@ -74,9 +75,44 @@ export default async function ProductsPage() {
 - **Impact**: Product listing page has no title tag, no meta description, no OG tags in the rendered HTML.
 - **Fix**: Remove `'use client'` from the page (see fix above), or extract interactive parts into a child Client Component.
 
+### [CRITICAL] AI Search Readiness: AI retrieval bots blocked in robots.txt
+
+- **Location**: `public/robots.txt:1`
+- **Problem**: robots.txt contains `User-agent: *` with `Disallow: /` and no specific `Allow` rules for AI retrieval bots. ChatGPT-User, PerplexityBot, and ClaudeBot are blocked from fetching content.
+- **Impact**: Site content will not appear in AI search results (ChatGPT, Perplexity, Claude). AI-generated answers cannot cite this site.
+- **Fix**: Add explicit Allow rules for AI retrieval bots above the blanket Disallow rule.
+
+<details>
+<summary>Code example</summary>
+
+```
+# Before (problematic)
+User-agent: *
+Disallow: /
+
+# After (fixed) — add before the blanket rule
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: *
+Disallow: /private/
+Sitemap: https://acme-store.com/sitemap.xml
+```
+
+</details>
+
 ---
 
-## High Priority Issues (5)
+## High Priority Issues (6)
 
 ### [HIGH] Technical SEO: No sitemap.xml or robots.txt
 
@@ -106,6 +142,13 @@ export default async function ProductsPage() {
 - **Impact**: Images served in original format (PNG/JPG) at full size. No WebP/AVIF, no responsive srcset.
 - **Fix**: Replace `<img>` with `next/image` component.
 
+### [HIGH] AI Search Readiness: No llms.txt file
+
+- **Location**: site-wide
+- **Problem**: No `llms.txt` file found at project root (`public/llms.txt`). AI systems have no structured way to discover site content, documentation, and key pages.
+- **Impact**: AI search engines must rely solely on crawling to understand the site. A well-structured `llms.txt` directly tells AI systems what content is available and how the site is organized.
+- **Fix**: Create `public/llms.txt` with site description and links to key content.
+
 ### [HIGH] Meta & Structured Data: Missing structured data on product pages
 
 - **Location**: `app/products/[slug]/page.tsx`
@@ -115,7 +158,7 @@ export default async function ProductsPage() {
 
 ---
 
-## Medium Priority Issues (12)
+## Medium Priority Issues (15)
 
 - [MEDIUM] Meta: Title tags exceed 60 characters on 3 pages
 - [MEDIUM] Meta: Missing Open Graph images on blog pages
@@ -129,8 +172,11 @@ export default async function ProductsPage() {
 - [MEDIUM] Next.js: No `loading.tsx` files for Suspense boundaries
 - [MEDIUM] Next.js: Missing `sizes` prop on 3 fill-mode Images
 - [MEDIUM] Images: Serving PNG images that should be WebP (public/team/*.png)
+- [MEDIUM] AEO: Articles missing `dateModified` in JSON-LD structured data
+- [MEDIUM] AEO: No `<main>` element — AI crawlers can't identify primary content area
+- [MEDIUM] AEO: FAQ section on support page lacks FAQPage schema
 
-## Low Priority Issues (8)
+## Low Priority Issues (10)
 
 - [LOW] Technical: Missing `lang` attribute on `<html>` in root layout
 - [LOW] Technical: Trailing slash inconsistency across internal links
@@ -140,6 +186,8 @@ export default async function ProductsPage() {
 - [LOW] Next.js: No `opengraph-image.tsx` for dynamic OG generation
 - [LOW] Next.js: No `not-found.tsx` custom error page
 - [LOW] Images: Decorative images with non-empty alt text
+- [LOW] AEO: No question-format headings on blog posts (missed AI query matching)
+- [LOW] AEO: No dedicated author pages — weakens E-E-A-T signals for AI
 
 ---
 
@@ -160,3 +208,6 @@ export default async function ProductsPage() {
 - Add `generateStaticParams` to all dynamic routes for SSG
 - Set up `next/font` for font loading optimization
 - Configure security headers in `next.config.js`
+- Create `llms.txt` with structured site information for AI discovery
+- Add entity-optimized properties (`sameAs`, `dateModified`, `mainEntityOfPage`) to all structured data
+- Build dedicated author pages with Person schema for E-E-A-T signals

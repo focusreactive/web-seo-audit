@@ -2,10 +2,10 @@
 
 **Scan your web project for SEO issues. Get a scored report. Fix and repeat.**
 
-A Claude Code plugin that performs code-level SEO analysis — no browser, no Lighthouse, no live URLs needed. It reads your source code, detects framework patterns, and produces a scored report across 5 categories with specific file locations and fixes.
+A Claude Code plugin that performs code-level SEO analysis — no browser, no Lighthouse, no live URLs needed. It reads your source code, detects framework patterns, and produces a scored report across 6 categories with specific file locations and fixes.
 
 ```
-SEO Health Score: 72/100 (C+) — WARNING
+SEO Health Score: 71/100 (C) — WARNING
 
 | Category             | Score    | Status  | Issues           |
 |----------------------|----------|---------|------------------|
@@ -14,12 +14,13 @@ SEO Health Score: 72/100 (C+) — WARNING
 | Next.js Patterns     | 70/100   | WARNING | 1C 0H 5M 2L     |
 | Meta & Structured    | 84/100   | PASS    | 0C 2H 0M 0L     |
 | Image Optimization   | 62/100   | WARNING | 0C 2H 4M 1L     |
+| AI Search Readiness  | 55/100   | FAIL    | 1C 1H 3M 2L     |
 ```
 
 ## What it does
 
 1. **Detects your framework** — Next.js (App Router, Pages Router), React, Vue, Nuxt, Astro, and more
-2. **Spawns 3 specialized agents in parallel** — technical SEO, performance/CWV, and framework-specific checks
+2. **Spawns up to 4 specialized agents in parallel** — technical SEO, performance/CWV, AI search readiness, and framework-specific checks
 3. **Produces a scored report** — 0-100 health score per category, letter grade (A+ to F), PASS/WARNING/FAIL status, with every issue tied to a file path and a concrete fix
 
 ## Install
@@ -53,11 +54,12 @@ Open Claude Code in any web project and run:
 
 | Command | What it does |
 |---------|-------------|
-| `/web-seo-audit` | Full audit — all 5 categories, scored report |
+| `/web-seo-audit` | Full audit — all 6 categories, scored report |
 | `/web-seo-audit nextjs` | Next.js deep check — metadata API, Server Components, data fetching |
 | `/web-seo-audit cwv` | Core Web Vitals focus — LCP, INP, CLS risk analysis |
 | `/web-seo-audit meta` | Meta tags & structured data — title, OG, Twitter, JSON-LD |
 | `/web-seo-audit images` | Image optimization — format, sizing, lazy loading, alt text |
+| `/web-seo-audit aeo` | AI search readiness — llms.txt, AI crawlers, entity data, content structure |
 | `/web-seo-audit page <path>` | Single page analysis — inline check, no agents spawned |
 | `/web-seo-audit url <url>` | Live URL quick-check — supplementary to code analysis |
 
@@ -70,6 +72,7 @@ Open Claude Code in any web project and run:
 | **Next.js Patterns** | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | `web-seo-nextjs` |
 | **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types) | `web-seo-technical` |
 | **Image Optimization** | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop | `web-seo-performance` |
+| **AI Search Readiness** | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals | `web-seo-aeo` |
 
 ## Scored output
 
@@ -81,9 +84,9 @@ Every audit produces a health score using a transparent methodology:
 
 **Status**: PASS (80+), WARNING (60-79), FAIL (0-59)
 
-**Weights (Next.js)**: Technical SEO 25%, Performance 25%, Next.js Patterns 20%, Meta & Structured Data 20%, Image Optimization 10%
+**Weights (Next.js)**: Technical SEO 22%, Performance 22%, Next.js Patterns 18%, Meta & Structured Data 18%, Image Optimization 10%, AI Search Readiness 10%
 
-**Weights (other frameworks)**: Technical SEO 30%, Performance 30%, Meta & Structured Data 25%, Image Optimization 15%
+**Weights (other frameworks)**: Technical SEO 27%, Performance 27%, Meta & Structured Data 23%, Image Optimization 13%, AI Search Readiness 10%
 
 Every issue includes: priority level, file path with line number, problem description, impact explanation, and a concrete code fix.
 
@@ -104,17 +107,17 @@ See [`examples/sample-output.md`](examples/sample-output.md) for a full example 
 │  - Compiles final report │
 └────────┬────────────────┘
          │ spawns in parallel
-         ├──────────────────────────────┐
-         │                              │
-         ▼                              ▼
-┌─────────────────┐  ┌──────────────────────┐
-│ web-seo-technical│  │ web-seo-performance  │
-│ - Crawlability   │  │ - LCP / INP / CLS    │
-│ - Meta tags      │  │ - Bundle size        │
-│ - Structured data│  │ - Image optimization │
-│ - Security       │  │ - Font loading       │
-│ - Internal links │  │ - Third-party scripts│
-└─────────────────┘  └──────────────────────┘
+         ├──────────────────────────────┬──────────────────────┐
+         │                              │                      │
+         ▼                              ▼                      ▼
+┌─────────────────┐  ┌──────────────────────┐  ┌─────────────────┐
+│ web-seo-technical│  │ web-seo-performance  │  │ web-seo-aeo     │
+│ - Crawlability   │  │ - LCP / INP / CLS    │  │ - llms.txt      │
+│ - Meta tags      │  │ - Bundle size        │  │ - AI crawlers   │
+│ - Structured data│  │ - Image optimization │  │ - Entity data   │
+│ - Security       │  │ - Font loading       │  │ - Content struct │
+│ - Internal links │  │ - Third-party scripts│  │ - AI crawlability│
+└─────────────────┘  └──────────────────────┘  └─────────────────┘
          │
          ▼ (Next.js projects only)
 ┌─────────────────┐
@@ -130,7 +133,8 @@ Reference files (loaded by orchestrator):
   ├── quality-gates.md    — Scoring rules & weights
   ├── cwv-thresholds.md   — Core Web Vitals reference
   ├── nextjs-patterns.md  — Next.js detection rules
-  └── schema-types.md     — JSON-LD validation (10 types)
+  ├── schema-types.md     — JSON-LD validation (10 types)
+  └── aeo-patterns.md     — AI search readiness patterns
 ```
 
 ## Framework support
@@ -187,11 +191,13 @@ web-seo-audit/
 │           ├── quality-gates.md # Scoring methodology
 │           ├── cwv-thresholds.md# CWV thresholds & patterns
 │           ├── nextjs-patterns.md# Next.js detection rules
-│           └── schema-types.md  # JSON-LD validation
+│           ├── schema-types.md  # JSON-LD validation
+│           └── aeo-patterns.md  # AI search readiness patterns
 ├── agents/
 │   ├── web-seo-technical.md     # Technical SEO agent
 │   ├── web-seo-performance.md   # Performance agent
-│   └── web-seo-nextjs.md       # Next.js agent
+│   ├── web-seo-nextjs.md       # Next.js agent
+│   └── web-seo-aeo.md          # AI search readiness agent
 ├── examples/
 │   └── sample-output.md        # Example audit report
 ├── install.sh                   # Manual installer

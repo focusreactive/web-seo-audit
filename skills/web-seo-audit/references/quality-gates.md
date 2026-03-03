@@ -10,20 +10,22 @@ This reference defines the scoring methodology for tech SEO audits. Each audit p
 
 | Category | Weight | Agent |
 |----------|--------|-------|
-| Technical SEO | 25% | web-seo-technical |
-| Performance | 25% | web-seo-performance |
-| Next.js Patterns | 20% | web-seo-nextjs |
-| Meta & Structured Data | 20% | web-seo-technical |
+| Technical SEO | 22% | web-seo-technical |
+| Performance | 22% | web-seo-performance |
+| Next.js Patterns | 18% | web-seo-nextjs |
+| Meta & Structured Data | 18% | web-seo-technical |
 | Image Optimization | 10% | web-seo-performance |
+| AI Search Readiness | 10% | web-seo-aeo |
 
 ### Non-Next.js Projects
 
 | Category | Weight | Agent |
 |----------|--------|-------|
-| Technical SEO | 30% | web-seo-technical |
-| Performance | 30% | web-seo-performance |
-| Meta & Structured Data | 25% | web-seo-technical |
-| Image Optimization | 15% | web-seo-performance |
+| Technical SEO | 27% | web-seo-technical |
+| Performance | 27% | web-seo-performance |
+| Meta & Structured Data | 23% | web-seo-technical |
+| Image Optimization | 13% | web-seo-performance |
+| AI Search Readiness | 10% | web-seo-aeo |
 
 ## Deduction Rules
 
@@ -71,6 +73,35 @@ Each category starts at 100. Issues deduct points based on priority:
 - Suboptimal image compression
 - Missing `rel="noopener"` on external links
 - Breadcrumb markup could be added
+
+### AEO-Specific Deduction Examples
+
+**CRITICAL (-15 each)**
+- AI retrieval bots (ChatGPT-User, PerplexityBot, ClaudeBot) blocked via robots.txt
+- Blanket `Disallow: /` with no Allow rules for AI retrieval bots
+
+**HIGH (-8 each)**
+- No `llms.txt` file (AI systems can't discover structured site information)
+- Organization schema missing `sameAs` (AI can't verify entity identity)
+
+**MEDIUM (-3 each, max 10)**
+- Articles missing `dateModified` (AI deprioritizes undated content)
+- No `@id` on primary structured data entities
+- Missing `mainEntityOfPage` on content pages
+- No `<main>` element (AI can't identify primary content area)
+- Content pages without `<article>` wrapper
+- FAQ content behind JavaScript interactions (not in initial DOM)
+- Q&A content without FAQPage schema
+- Tutorial pages without HowTo schema
+- No explicit AI bot rules in robots.txt
+
+**LOW (-1 each, max 10)**
+- Missing `speakable` markup
+- Missing `author.url` or `author.sameAs` on articles
+- No question-format headings on content pages
+- No dedicated author pages for blog content
+- No `llms-full.txt` when `llms.txt` exists
+- Training bots not explicitly managed in robots.txt
 
 ## Status Thresholds
 
@@ -168,8 +199,9 @@ When calculating, apply deduction caps for MEDIUM and LOW issues per category, n
 When the same issue appears in multiple categories (e.g., an image without alt text could be both Image Optimization and Meta & Structured Data):
 
 1. **Count the deduction in only one category** — the category that owns the issue per the agent boundary rules
-2. **Ownership priority**: Image issues → Image Optimization. Meta tag issues → Meta & Structured Data. Framework-specific issues → Next.js Patterns. If ambiguous, assign to the category where the issue has the higher priority level.
-3. **Still mention the issue** in the other category's report for context, but mark it as "(scored under {owning category})" and do not deduct points for it there.
+2. **Ownership priority**: Image issues → Image Optimization. Meta tag issues → Meta & Structured Data. Framework-specific issues → Next.js Patterns. AEO issues → AI Search Readiness. If ambiguous, assign to the category where the issue has the higher priority level.
+3. **AEO ownership rules**: AI bot rules in robots.txt → AI Search Readiness (not Technical SEO). Entity properties (`sameAs`, `about`, `dateModified` freshness, `mainEntityOfPage`, `speakable`, `reviewedBy`, `@id`) → AI Search Readiness (not Meta & Structured Data). FAQPage/HowTo schema presence → AI Search Readiness. Question-format headings → AI Search Readiness. Semantic landmarks for AI extraction → AI Search Readiness. SSR/SSG scoring → Performance (AEO can cross-reference but not deduct).
+4. **Still mention the issue** in the other category's report for context, but mark it as "(scored under {owning category})" and do not deduct points for it there.
 
 ### Incomplete Categories
 
@@ -190,4 +222,5 @@ When a category has no data (agent failure or not applicable):
 | Next.js Patterns | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | Meta & Structured Data | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | Image Optimization | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
+| AI Search Readiness | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 ```

@@ -32,7 +32,7 @@ else
 fi
 
 # ─── Remove agents ───────────────────────────────────────────────────
-for agent in web-seo-technical.md web-seo-performance.md web-seo-nextjs.md; do
+for agent in web-seo-technical.md web-seo-performance.md web-seo-nextjs.md web-seo-aeo.md; do
     if [[ -f "$AGENT_DIR/$agent" ]]; then
         info "Removing $AGENT_DIR/$agent ..."
         rm "$AGENT_DIR/$agent"

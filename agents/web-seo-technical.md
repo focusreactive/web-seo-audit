@@ -14,7 +14,13 @@ You are responsible for two scoring categories:
 1. **Technical SEO** — Crawlability, indexability, URL structure, security, internal linking, mobile optimization, internationalization
 2. **Meta & Structured Data** — Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD structured data
 
-**Boundary**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema).
+**Boundary — Image Optimization**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema).
+
+**Boundary — AI Search Readiness (AEO)**: The following areas are owned by `web-seo-aeo` and must NOT be scored here:
+- **robots.txt**: AI bot rules (GPTBot, ChatGPT-User, Google-Extended, PerplexityBot, ClaudeBot, CCBot, Bytespider, Applebot-Extended) and training vs retrieval bot distinction → AEO. You own: robots.txt existence, general `Disallow` rules, and sitemap reference.
+- **Structured data**: Entity properties (`sameAs`, `about`, `dateModified` freshness, `mainEntityOfPage`, `speakable`, `reviewedBy`, `@id` consistency) → AEO. FAQPage and HowTo schema presence → AEO. You own: required fields, `@context`, format validation, URL correctness.
+- **Headings**: Question-format headings and answer-first paragraph patterns → AEO. You own: H1 count and heading level skipping.
+- **Semantic HTML**: Landmark elements (`<main>`, `<article>`, `<section>`, `<aside>`) for AI extraction → AEO. You own: viewport, mobile checks.
 
 ## Path Convention
 
@@ -53,6 +59,7 @@ Run these checks in order:
 - Check for overly broad `Disallow` rules blocking important content
 - Ensure sitemap URL is referenced
 - Flag `Disallow: /` (blocks everything)
+- Note: AI bot-specific rules (GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, etc.) are scored by `web-seo-aeo`, not here
 
 **Sitemap**
 - `glob: public/sitemap*.xml` or `glob: app/sitemap.{ts,js}`
@@ -115,6 +122,7 @@ Use the schema-types reference provided by the orchestrator in your agent prompt
 - Check for placeholder/empty values
 - Validate date formats (ISO 8601)
 - Flag duplicate primary schemas on the same page
+- Note: Entity-optimized properties (`sameAs`, `about`, `dateModified` freshness, `mainEntityOfPage`, `speakable`, `reviewedBy`, `@id`) and FAQPage/HowTo presence are scored by `web-seo-aeo`, not here
 
 **Coverage**
 - Homepage should have Organization + WebSite schemas

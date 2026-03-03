@@ -1,7 +1,7 @@
 ---
 name: web-seo-audit
-description: Analyze web projects for technical SEO and performance issues. Runs code-level analysis for crawlability, Core Web Vitals, meta tags, structured data, image optimization, and framework-specific patterns. Supports Next.js (App Router & Pages Router) with specialized checks.
-argument-hint: "[audit|page <path>|nextjs|cwv|meta|images|url <url>]"
+description: Analyze web projects for technical SEO, performance, and AI search readiness. Runs code-level analysis for crawlability, Core Web Vitals, meta tags, structured data, image optimization, AI search readiness (AEO), and framework-specific patterns. Supports Next.js (App Router & Pages Router) with specialized checks.
+argument-hint: "[audit|page <path>|nextjs|cwv|meta|images|aeo|url <url>]"
 ---
 
 # Tech SEO & Performance Analyzer
@@ -103,23 +103,26 @@ Runs a comprehensive audit across all categories. This is the default command.
    - Read `references/cwv-thresholds.md` for CWV reference
    - If Next.js: Read `references/nextjs-patterns.md`
    - Read `references/schema-types.md` for structured data reference
+   - Read `references/aeo-patterns.md` for AI search readiness reference
 4. Spawn agents **in parallel** using the Agent tool. **Include in each agent's prompt**:
    - The detected framework, router type, and version
    - The detected source root prefix (e.g., `src/`, `packages/web/`, or empty for root-level)
    - A summary of the quality-gates scoring rules (deduction values, caps, output format)
    - The relevant reference content for that agent's scope
 
-   **For Next.js projects** (spawn all 3):
+   **For Next.js projects** (spawn all 4):
    ```
    Agent: web-seo-technical   — "Analyze technical SEO: crawlability, indexability, meta tags, structured data, security, URL structure, internal linking. Framework: {framework} {version}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. Schema-types reference: {content of schema-types.md}."
    Agent: web-seo-performance  — "Analyze performance: LCP, INP, CLS patterns, bundle size, image optimization, font loading, third-party scripts. Framework: {framework} {version}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. CWV reference: {content of cwv-thresholds.md}."
    Agent: web-seo-nextjs       — "Analyze Next.js patterns: metadata API, Server/Client Components, data fetching, next/image, next/link, next/font, route config. Router: {nextjsRouter}. Version: {nextjsVersion}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. Next.js patterns reference: {content of nextjs-patterns.md}."
+   Agent: web-seo-aeo          — "Analyze AI search readiness: llms.txt, AI crawler management, entity-optimized structured data, content structure for AI extraction, AI crawlability. Framework: {framework} {version}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. AEO patterns reference: {content of aeo-patterns.md}."
    ```
 
-   **For non-Next.js projects** (spawn 2):
+   **For non-Next.js projects** (spawn 3):
    ```
    Agent: web-seo-technical   — "Analyze technical SEO: crawlability, indexability, meta tags, structured data, security, URL structure, internal linking. Framework: {framework}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. Schema-types reference: {content of schema-types.md}."
    Agent: web-seo-performance  — "Analyze performance: LCP, INP, CLS patterns, bundle size, image optimization, font loading, third-party scripts. Framework: {framework}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. CWV reference: {content of cwv-thresholds.md}."
+   Agent: web-seo-aeo          — "Analyze AI search readiness: llms.txt, AI crawler management, entity-optimized structured data, content structure for AI extraction, AI crawlability. Framework: {framework}. Source root: {sourceRoot}. Quality-gates: {summary of scoring rules}. AEO patterns reference: {content of aeo-patterns.md}."
    ```
 
 5. Collect results from all agents and validate completeness (see Agent Result Validation)
@@ -140,6 +143,7 @@ Analyze a specific page/route file for SEO issues.
    - Image optimization
    - Performance patterns (client-side fetching, render-blocking)
    - Accessibility basics (headings, alt text, semantic HTML)
+   - AI search readiness (semantic landmarks, question headings, entity structured data properties, FAQPage/HowTo schemas)
    - If Next.js: framework-specific patterns for that page
 4. Report issues found in that page only
 5. Provide a mini-score for the page
@@ -198,6 +202,19 @@ Check image optimization across the project.
    Agent: web-seo-performance — "Focus on image optimization analysis: check image formats, sizing, lazy loading, alt attributes, responsive images, next/image usage, and above-the-fold image priorities. Framework: {framework}. Source root: {sourceRoot}. Quality-gates: {summary}."
    ```
 4. Present results with Image Optimization score
+
+### `aeo` — AI Search Readiness
+
+Analyze the project for AI search engine optimization (AEO).
+
+**Steps**:
+1. Run framework detection and source root detection
+2. Load `references/aeo-patterns.md` and `references/quality-gates.md`
+3. Spawn agent:
+   ```
+   Agent: web-seo-aeo — "Run a comprehensive AI search readiness audit covering llms.txt, AI crawler management (8 bots, training vs retrieval), entity-optimized structured data (sameAs, about, dateModified, mainEntityOfPage, speakable, @id), content structure for AI extraction (landmarks, question headings), and AI crawlability signals. Framework: {framework}. Source root: {sourceRoot}. Quality-gates: {summary}. AEO patterns reference: {content}."
+   ```
+4. Present results with AI Search Readiness score
 
 ### `url <url>` — Live URL Analysis (Optional)
 
@@ -280,6 +297,7 @@ Use this template for the full audit report:
 | Next.js Patterns | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | Meta & Structured Data | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | Image Optimization | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
+| AI Search Readiness | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 
 > Omit the "Next.js Patterns" row for non-Next.js projects.
 
@@ -334,8 +352,8 @@ Read `references/quality-gates.md` for the full scoring methodology. Key rules:
 1. Each category starts at 100
 2. Deduct per issue: CRITICAL -15, HIGH -8, MEDIUM -3 (max 10), LOW -1 (max 10)
 3. Floor at 0 (no negative scores)
-4. Overall score = weighted average based on framework type, rounded to nearest integer (half-up)
-5. Deduplicate cross-category issues before scoring (count deduction in owning category only)
+4. Overall score = weighted average based on framework type, rounded to nearest integer (half-up). Next.js: Technical 22%, Performance 22%, Next.js 18%, Meta 18%, Images 10%, AEO 10%. Non-Next.js: Technical 27%, Performance 27%, Meta 23%, Images 13%, AEO 10%.
+5. Deduplicate cross-category issues before scoring (count deduction in owning category only). AEO owns: AI bot rules, entity properties, FAQPage/HowTo presence, question headings, semantic landmarks.
 6. If a category is incomplete, redistribute its weight proportionally across available categories
 7. Apply grade scale: A+ (95-100) through F (0-49)
 8. Apply status: PASS (80+), WARNING (60-79), FAIL (0-59)
