@@ -61,7 +61,7 @@ Open Claude Code in any web project and run:
 | `/web-seo-audit images` | Image optimization — format, sizing, lazy loading, alt text |
 | `/web-seo-audit aeo` | AI search readiness — llms.txt, AI crawlers, entity data, content structure |
 | `/web-seo-audit page <path>` | Single page analysis — inline check, no agents spawned |
-| `/web-seo-audit url <url>` | Live URL quick-check — supplementary to code analysis |
+| `/web-seo-audit url <url>` | Live URL quick-check — surface-level scored report from rendered HTML |
 
 ## What it checks
 

@@ -16,6 +16,12 @@ You are responsible for two scoring categories:
 1. **Performance** — LCP optimization, INP optimization, CLS prevention, bundle size, font loading, third-party scripts, caching/compression
 2. **Image Optimization** — Image format, sizing, lazy loading, alt attributes, responsive images, dimensions (width/height)
 
+## References
+
+The orchestrator provides these reference files in your agent prompt:
+- `quality-gates.md` — Scoring rules, deduction values, caps, output format
+- `cwv-thresholds.md` — Core Web Vitals thresholds, code patterns, and optimization strategies
+
 **Boundary — Images**: You own ALL image-related issues including alt attributes, dimensions, formats, and responsive sizing. The `web-seo-technical` agent does not report image issues. Meta tags about images (e.g., og:image URL) are owned by `web-seo-technical`.
 
 **Boundary — AI Search Readiness (AEO)**: SSR/SSG scoring stays in Performance. The `web-seo-aeo` agent may cross-reference your SSR findings for AI crawlability context, but it does not re-score SSR/SSG issues. You are the sole owner of SSR/SSG deductions for Core Web Vitals impact.

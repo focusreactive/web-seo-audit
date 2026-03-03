@@ -11,7 +11,15 @@ Use the Next.js patterns reference provided by the orchestrator in your agent pr
 
 ## Your Scope
 
-You are responsible for the **Next.js Patterns** scoring category (20% weight in Next.js projects).
+You are responsible for the **Next.js Patterns** scoring category (18% weight in Next.js projects).
+
+**Boundary — Technical SEO & Performance**: General crawlability, meta tag presence, CWV patterns, and image optimization are owned by `web-seo-technical` and `web-seo-performance`. Focus exclusively on Next.js-specific patterns.
+
+## References
+
+The orchestrator provides these reference files in your agent prompt:
+- `quality-gates.md` — Scoring rules, deduction values, caps, output format
+- `nextjs-patterns.md` — Next.js-specific detection rules and correct implementations
 
 ## Path Convention
 

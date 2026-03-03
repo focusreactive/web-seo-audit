@@ -1,5 +1,7 @@
 # Sample Audit Output
 
+> **Note**: This is a static example for illustration purposes. Dates, scores, and file paths are fictional.
+
 This is an example of what `web-seo-audit` produces when run against a Next.js 14 e-commerce project.
 
 ---
@@ -9,7 +11,7 @@ This is an example of what `web-seo-audit` produces when run against a Next.js 1
 **Project**: acme-store
 **Framework**: Next.js 14.2.3
 **Router**: App Router
-**Date**: 2026-03-01
+**Date**: 2025-01-15
 
 ---
 

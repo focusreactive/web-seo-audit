@@ -208,7 +208,7 @@ When the same issue appears in multiple categories (e.g., an image without alt t
 When a category has no data (agent failure or not applicable):
 - Exclude the category from the overall score calculation
 - Redistribute its weight proportionally across remaining categories
-- Example: If Next.js Patterns (20%) is unavailable, redistribute as: Technical SEO 31.25%, Performance 31.25%, Meta & Structured Data 25%, Image Optimization 12.5%
+- Example: If Next.js Patterns (18%) is unavailable, redistribute proportionally across the remaining 5 categories (total remaining = 82%): Technical SEO ~26.8%, Performance ~26.8%, Meta & Structured Data ~22.0%, Image Optimization ~12.2%, AI Search Readiness ~12.2%
 
 ## Report Summary Format
 
