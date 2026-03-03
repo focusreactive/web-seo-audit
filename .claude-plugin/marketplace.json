@@ -1,0 +1,20 @@
+{
+  "name": "focusreactive-seo-tools",
+  "owner": {
+    "name": "Focus Reactive",
+    "email": "open-source@focusreactive.com"
+  },
+  "metadata": {
+    "description": "SEO and web performance audit tools for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "web-seo-audit",
+      "source": "./",
+      "description": "Scan web projects for SEO issues. Get a scored report with 5 categories, CWV risk assessment, and actionable fixes.",
+      "version": "1.0.0",
+      "category": "seo",
+      "tags": ["seo", "audit", "performance", "nextjs", "core-web-vitals"]
+    }
+  ]
+}
