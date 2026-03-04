@@ -231,9 +231,16 @@ Runs the full audit, then automatically applies safe fixes and re-audits until t
 
    Track results: `applied`, `failed`, `skipped` counts.
 
-7. **Re-audit** — Run the full `audit` flow again on the modified codebase. Record the new overall score and per-category scores.
+7. **Build Verification** — After applying fixes, verify the project still builds:
+   - Detect the build command from `package.json` scripts (prefer `build`, fall back to `next build`, `tsc --noEmit`)
+   - Run the build command
+   - If build **succeeds**: proceed to re-audit
+   - If build **fails**: identify which fix(es) caused the failure from the error output, revert those fixes using the Edit tool, mark them as "failed — build broken", and proceed with the remaining fixes
+   - Show build verification result: `Build verification: PASS` or `Build verification: FAIL — reverted {n} fix(es)`
 
-8. **Show Delta** — Display a comparison:
+8. **Re-audit** — Run the full `audit` flow again on the modified codebase. Record the new overall score and per-category scores.
+
+9. **Show Delta** — Display a comparison:
    ```
    ## Fix Cycle {iteration} Results
 
@@ -247,15 +254,15 @@ Runs the full audit, then automatically applies safe fixes and re-audits until t
    Fixes applied: {n} | Failed: {n} | Skipped: {n}
    ```
 
-9. **Loop Decision** — Stop if ANY of these conditions are met:
-   - Score >= target → "Target score reached!"
-   - Iteration count >= maxIterations → "Maximum iterations ({maxIterations}) reached."
-   - No fixes were applied in this iteration → "No progress — all remaining issues require manual fixes."
-   - Score decreased compared to previous iteration → "Score decreased ({before} → {after}). Stopping to avoid regression."
+10. **Loop Decision** — Stop if ANY of these conditions are met:
+    - Score >= target → "Target score reached!"
+    - Iteration count >= maxIterations → "Maximum iterations ({maxIterations}) reached."
+    - No fixes were applied in this iteration → "No progress — all remaining issues require manual fixes."
+    - Score decreased compared to previous iteration → "Score decreased ({before} → {after}). Stopping to avoid regression."
 
-   If none met, loop back to step 4 (classify issues from the new audit, which may find new issues or confirm previous fixes resolved problems).
+    If none met, loop back to step 4 (classify issues from the new audit, which may find new issues or confirm previous fixes resolved problems).
 
-10. **Final Report** — After the loop ends, compile a summary:
+11. **Final Report** — After the loop ends, compile a summary:
     ```
     ## Fix Cycle Complete
 

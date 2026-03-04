@@ -14,35 +14,35 @@ This reference defines how audit issues are classified by fixability for the `fi
 
 ### auto-fix — Safe Mechanical Changes
 
-These fixes are deterministic and cannot break functionality:
+These fixes add known, fixed-value attributes or standard directives. They NEVER generate content, guess values, or affect layout:
 
 | Issue Pattern | Fix Action | Tool |
 |---------------|-----------|------|
-| Missing `llms.txt` file | Create `public/llms.txt` with site info from `package.json` | Write |
-| Missing `alt` attribute on images | Add `alt=""` for decorative images, `alt="{descriptive}"` for content images where context is clear | Edit |
-| Missing `width`/`height` on `<img>` tags | Add explicit `width` and `height` attributes | Edit |
-| Missing JSON-LD structured data (Organization, WebSite) | Add JSON-LD script block with schema from site metadata | Write/Edit |
 | Missing `preconnect` hint for external origins | Add `<link rel="preconnect">` to root layout/head | Edit |
-| Missing AI bot rules in `robots.txt` | Append AI bot user-agent rules to existing robots.txt | Edit |
 | Missing `font-display: swap` | Add `font-display: swap` to `@font-face` rules or `next/font` config | Edit |
-| Missing `metadata` export on pages | Add basic metadata export with title/description derived from content | Edit |
 | Missing `lang` attribute on `<html>` | Add `lang="en"` (or detected language) to `<html>` tag | Edit |
 | Missing `rel="noopener"` on external links | Add `rel="noopener"` to `target="_blank"` links | Edit |
 | Missing `viewport` meta tag | Add viewport meta tag to root layout or `<head>` | Edit |
-| Missing `dateModified` in structured data | Add `dateModified` field to existing JSON-LD | Edit |
-| Missing `mainEntityOfPage` in structured data | Add `mainEntityOfPage` to existing JSON-LD on content pages | Edit |
-| Missing `@id` in structured data | Add `@id` based on canonical URL pattern | Edit |
-| Missing `sameAs` on Organization schema | Add `sameAs` array with social profile URLs if discoverable | Edit |
-| Missing `<main>` landmark | Wrap primary content area in `<main>` | Edit |
 | Missing `sitemap.xml` reference in `robots.txt` | Append `Sitemap:` directive to robots.txt | Edit |
 | Missing `loading="lazy"` on below-fold images | Add `loading="lazy"` to below-the-fold `<img>` tags | Edit |
+| Missing `mainEntityOfPage` in structured data | Add `mainEntityOfPage` using existing canonical URL from page | Edit |
 
 ### confirm-fix — Clear Fix, Moderate Risk
 
-These fixes have a clear solution but could affect behavior or layout:
+These fixes have a clear solution but could affect behavior, layout, or involve generated content that needs user review:
 
 | Issue Pattern | Fix Action | Risk | Tool |
 |---------------|-----------|------|------|
+| Missing `alt` attribute on images | Add `alt=""` for decorative, `alt="{descriptive}"` for content images | Generated descriptions may be inaccurate | Edit |
+| Missing `width`/`height` on `<img>` tags | Add explicit `width` and `height` attributes | Wrong dimensions break layout | Edit |
+| Missing JSON-LD structured data (Organization, WebSite) | Add JSON-LD script block with schema from site metadata | Generated business info may be inaccurate | Write/Edit |
+| Missing `metadata` export on pages | Add basic metadata export with title/description derived from content | Generated titles/descriptions are approximations | Edit |
+| Missing `llms.txt` file | Create `public/llms.txt` with site info from `package.json` | Generated content may misrepresent the site | Write |
+| Missing AI bot rules in `robots.txt` | Append AI bot user-agent rules to existing robots.txt | Policy decision — user may want AI bots blocked | Edit |
+| Missing `<main>` landmark | Wrap primary content area in `<main>` | May affect CSS selectors/styling | Edit |
+| Missing `dateModified` in structured data | Add `dateModified` field to existing JSON-LD | Cannot determine actual modification date from code | Edit |
+| Missing `@id` in structured data | Add `@id` based on canonical URL pattern | URL pattern may be incorrect | Edit |
+| Missing `sameAs` on Organization schema | Add `sameAs` array with social profile URLs if discoverable | May reference wrong social profiles | Edit |
 | Raw `<img>` tags → `next/image` | Replace `<img>` with `<Image>` component, add import | May change image sizing/layout | Edit |
 | Unnecessary `'use client'` on pages | Remove `'use client'` directive | Could break if component uses hooks | Edit |
 | Missing security headers | Add `headers()` function to `next.config.js` | Could conflict with deployment platform | Edit |
@@ -84,12 +84,15 @@ These issues require human judgment and cannot be safely automated:
 When classifying an issue from an agent's output, follow this order:
 
 1. **Match the issue's Fix description** against the patterns in the matrix above
-2. **If the fix involves creating a new file** from scratch with project-specific content → `manual`
-3. **If the fix involves creating a new file** with a standard template (llms.txt, robots.ts, sitemap.ts) → `auto-fix` or `confirm-fix`
-4. **If the fix is a single attribute/property addition** to existing code → `auto-fix`
-5. **If the fix replaces one component/API with another** → `confirm-fix`
-6. **If the fix requires restructuring or design decisions** → `manual`
-7. **If uncertain**, default to `confirm-fix` (safer than auto-fix, more actionable than manual)
+2. **If the fix generates content** (text, descriptions, structured data, titles) → `confirm-fix` at minimum
+3. **If the fix involves creating a new file** from scratch with project-specific content → `manual`
+4. **If the fix involves creating a new file** with a standard template (robots.ts, sitemap.ts) → `confirm-fix`
+5. **If the fix adds a single known-value attribute** (rel, loading, lang, viewport) → `auto-fix`
+6. **If the fix adds an attribute whose value must be inferred** (alt, width, height, dates) → `confirm-fix`
+7. **If the fix replaces one component/API with another** → `confirm-fix`
+8. **If the fix involves a policy decision** (bot access, rendering strategy) → `confirm-fix`
+9. **If the fix requires restructuring or design decisions** → `manual`
+10. **If uncertain**, default to `confirm-fix` (safer than auto-fix, more actionable than manual)
 
 ## Fix Application Rules
 
