@@ -39,8 +39,7 @@ They're complementary. Lighthouse tells you what's slow. This tells you *why* it
 ## Quick start
 
 ```bash
-/plugin marketplace add focusreactive/web-seo-audit
-/plugin install web-seo-audit@focusreactive-seo-tools
+curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/install.sh | bash
 ```
 
 Then open Claude Code in any web project:
@@ -50,15 +49,7 @@ Then open Claude Code in any web project:
 ```
 
 <details>
-<summary>Other install methods</summary>
-
-**One-liner**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/install.sh | bash
-```
-
-**Manual**
+<summary>Install from clone</summary>
 
 ```bash
 git clone https://github.com/focusreactive/web-seo-audit.git
@@ -357,20 +348,9 @@ web-seo-audit/
 
 ## Uninstall
 
-```
-/plugin uninstall web-seo-audit@focusreactive-seo-tools
-```
-
-<details>
-<summary>Manual uninstall</summary>
-
 ```bash
-./uninstall.sh
-# or
 curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/uninstall.sh | bash
 ```
-
-</details>
 
 ## License
 
