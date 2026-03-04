@@ -108,12 +108,38 @@ Run these checks in order:
 - Check for `twitter:card`, `twitter:title`, `twitter:description`
 - Verify OG images have proper dimensions (1200x630 recommended)
 
+**Cross-Page Duplicate Detection**
+- Collect all `title` values and `meta description` values across pages using grep
+- Build a value → files map for titles and descriptions separately
+- Flag exact-duplicate titles across different pages (HIGH per duplicate group)
+- Flag exact-duplicate descriptions across different pages (MEDIUM per duplicate group)
+- Flag near-duplicate titles (same text differing only in trailing punctuation, whitespace, or case) (MEDIUM)
+- Skip layout/template files that define shared defaults — only flag leaf page overrides
+
 **Viewport**
 - `grep "viewport" app/**/layout.{tsx,jsx} pages/_document.{tsx,jsx} public/**/*.html`
 - Verify viewport meta tag exists
 - Standard: `<meta name="viewport" content="width=device-width, initial-scale=1" />`
 
-### Step 4: Structured Data Analysis
+### Step 4: Heading Hierarchy Analysis
+
+Analyze heading structure across all pages for proper semantic hierarchy:
+
+**H1 Detection**
+- `grep "<h1|<H1|heading.*level.*1|role=\"heading\".*aria-level=\"1\"" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Every page/route must have exactly one H1 element
+- Flag pages with no H1 (HIGH) — missing primary heading harms search engine understanding
+- Flag pages with multiple H1 elements (MEDIUM) — dilutes topic signal
+
+**Heading Level Sequence**
+- `grep "<h[1-6]|<H[1-6]" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Check that heading levels don't skip (e.g., H1 → H3 with no H2)
+- Flag skipped heading levels per page (MEDIUM)
+- Map the heading tree per page template to identify structural issues
+
+**Boundary Note**: Question-format headings (e.g., "What is...?", "How to...?") and answer-first paragraph patterns are owned by `web-seo-aeo`. Only flag H1 count and heading level skipping here.
+
+### Step 5: Structured Data Analysis
 
 Use the schema-types reference provided by the orchestrator in your agent prompt for detailed validation rules. If no reference was provided, apply general schema.org best practices.
 
@@ -136,7 +162,28 @@ Use the schema-types reference provided by the orchestrator in your agent prompt
 - Product pages should have Product schema
 - Check for BreadcrumbList on pages with breadcrumb navigation
 
-### Step 5: Security Headers (Code-Level)
+### Step 6: Redirect Chain & Loop Detection
+
+Parse redirect configuration from all sources and build a redirect graph:
+
+**Source Detection**
+- `grep "redirects|redirect" next.config.{js,mjs,ts}` — Next.js `redirects()` function
+- `glob: **/middleware.{ts,js}` — Next.js middleware redirects
+- `glob: **/vercel.json` — Vercel platform redirects
+- `glob: **/.htaccess` — Apache redirect rules
+- `grep "rewrite|redirect|return 301|return 302" **/nginx.conf` — Nginx redirects
+
+**Graph Analysis**
+- Build a directed graph of all source → destination redirect mappings
+- Detect loops (A→B→A or longer cycles) — flag as CRITICAL, these create infinite redirect loops that block crawling entirely
+- Detect chains with >2 hops (A→B→C→D) — flag as HIGH, search engines may stop following after 3-5 hops
+- Detect 2-hop chains (A→B→C) — flag as MEDIUM, consolidation recommended
+
+**Status Code Checks**
+- Flag redirects using 302 (temporary) that should be 301 (permanent) — e.g., URL restructuring, domain changes (MEDIUM)
+- Verify `permanent: true` vs `permanent: false` in Next.js redirect config aligns with intent
+
+### Step 7: Security Headers (Code-Level)
 
 Check configuration files for security-relevant settings:
 
@@ -146,21 +193,45 @@ Check configuration files for security-relevant settings:
 - Check for mixed content patterns (`http://` URLs in code)
 - `grep "http://" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx} styles/**/*.css`
 
-### Step 6: Internal Linking
+### Step 8: Internal Linking & Crawl Depth
 
 - Check for broken link patterns: `grep "href=\"#\"|href=\"\"|href=\"javascript:" **/*.{tsx,jsx}`
 - Verify internal links use framework's Link component
 - Check for orphaned pages (pages not linked from anywhere)
 - Verify meaningful anchor text (not "click here", "read more")
 
-### Step 7: Mobile Optimization
+**Crawl Depth**
+- `glob: app/**/page.{tsx,jsx,ts,js}` or `glob: pages/**/*.{tsx,jsx,ts,js}` — collect all page routes
+- Count URL path segments for each page, ignoring Next.js route groups (parenthesized folders like `(marketing)`)
+- Example: `app/(marketing)/blog/[slug]/comments/page.tsx` → depth = 3 (`/blog/[slug]/comments`)
+- Flag pages with depth > 4 segments (HIGH) — deep pages receive less link equity and are crawled less frequently
+- Flag pages with depth > 3 segments (MEDIUM) — consider flattening URL structure
+- Report the deepest pages and suggest URL restructuring where applicable
+
+### Step 9: Mobile Optimization
 
 - Verify viewport meta tag
 - Check for fixed-width layouts: `grep "width:\s*\d+px" styles/**/*.css **/*.{tsx,jsx}`
 - Check for tap target sizing in CSS
 - Note: Responsive image checks (srcset, next/image) are handled by the `web-seo-performance` agent under Image Optimization. Do NOT duplicate those checks here.
 
-### Step 8: Internationalization (if applicable)
+### Step 10: Thin Content Signals
+
+Detect pages that may have zero or minimal server-rendered content:
+
+**Zero Server Content**
+- Identify page files that immediately delegate to a client component (e.g., `export default function Page() { return <ClientComponent /> }` where the component file has `'use client'`)
+- Flag pages where the only JSX is a single client component wrapper with no static text or headings (HIGH) — search engines may see an empty page
+- `grep "'use client'" app/**/page.{tsx,jsx} pages/**/*.{tsx,jsx}` — pages that are themselves client components
+
+**Minimal Static Content**
+- Check page files for the amount of static JSX (text content, headings, paragraphs)
+- Flag pages where all visible content is loaded via `useEffect`, `useSWR`, `useQuery`, `fetch` in client components (MEDIUM) — content may not be in initial HTML
+- `grep "useEffect|useSWR|useQuery|useFetch" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+
+**Boundary Note**: Whole-app SSR/SSG strategy (e.g., converting an entire SPA to use server-side rendering) is owned by `web-seo-performance`. Only flag individual pages with thin/missing server content here. Do not recommend app-wide rendering strategy changes.
+
+### Step 11: Internationalization (if applicable)
 
 - `grep "hreflang|i18n|locale" app/**/*.{tsx,jsx} next.config.{js,mjs,ts}`
 - Check for `lang` attribute on `<html>`

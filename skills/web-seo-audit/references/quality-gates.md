@@ -47,6 +47,7 @@ Each category starts at 100. Issues deduct points based on priority:
 - No HTTPS or mixed content on production
 - Missing viewport meta tag
 - JavaScript-only rendering with no SSR/SSG
+- Redirect loops (A→B→A or longer cycles) — blocks crawling entirely
 
 **HIGH (-8 each)**
 - Missing `<title>` or `<meta description>` on important pages
@@ -56,6 +57,10 @@ Each category starts at 100. Issues deduct points based on priority:
 - Bundle size > 500KB for initial load
 - Missing `alt` attributes on meaningful images
 - No sitemap.xml or robots.txt
+- Missing H1 element on a page
+- Redirect chains > 2 hops (A→B→C→D)
+- Route depth > 4 path segments from root
+- Zero server-rendered content on a page (client component wrapper only)
 
 **MEDIUM (-3 each, max 10)**
 - Title tag too long (> 60 chars) or too short (< 30 chars)
@@ -65,6 +70,12 @@ Each category starts at 100. Issues deduct points based on priority:
 - Missing Open Graph or Twitter Card meta tags
 - Fonts not preloaded or using `font-display: swap`
 - Non-semantic heading hierarchy (skipping levels)
+- Multiple H1 elements on a single page
+- Duplicate meta descriptions across pages
+- 2-hop redirect chains (A→B→C) — consolidation recommended
+- Redirect using 302 (temporary) when 301 (permanent) is appropriate
+- Route depth > 3 path segments from root
+- Minimal server-rendered content (all visible content loaded client-side)
 
 **LOW (-1 each, max 10)**
 - Trailing slashes inconsistency
