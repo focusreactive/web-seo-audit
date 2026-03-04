@@ -198,6 +198,8 @@ glob: app/about/**/*.{tsx,jsx}
 
 Return findings as a structured list of issues following the quality-gates format provided by the orchestrator in your agent prompt.
 
+For each issue, include a **Fixability** classification (`auto-fix`, `confirm-fix`, or `manual`) based on the fix-classification rules in the quality-gates reference.
+
 Report under the **AI Search Readiness** category:
 - Total issues by priority (CRITICAL / HIGH / MEDIUM / LOW)
 - Category score (starting at 100, applying deductions)

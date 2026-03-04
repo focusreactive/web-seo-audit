@@ -55,6 +55,8 @@ Open Claude Code in any web project and run:
 | Command | What it does |
 |---------|-------------|
 | `/web-seo-audit` | Full audit — all 6 categories, scored report |
+| `/web-seo-audit fix` | Audit, auto-fix issues, re-audit — iterative cycle until target score |
+| `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80) |
 | `/web-seo-audit nextjs` | Next.js deep check — metadata API, Server Components, data fetching |
 | `/web-seo-audit cwv` | Core Web Vitals focus — LCP, INP, CLS risk analysis |
 | `/web-seo-audit meta` | Meta tags & structured data — title, OG, Twitter, JSON-LD |
@@ -73,6 +75,23 @@ Open Claude Code in any web project and run:
 | **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types) | `web-seo-technical` |
 | **Image Optimization** | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop | `web-seo-performance` |
 | **AI Search Readiness** | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals | `web-seo-aeo` |
+
+## Fix cycle
+
+The `fix` subcommand automates the audit-fix-verify loop:
+
+1. **Audit** — Runs the full audit to identify all issues
+2. **Classify** — Buckets issues into auto-fix (safe mechanical changes), confirm-fix (ask first), and manual (report only)
+3. **Fix plan** — Shows what will be changed and estimated score improvement
+4. **Apply** — Auto-fixes are applied directly; confirm-fixes are shown for approval
+5. **Re-audit** — Runs the full audit again to verify fixes and catch regressions
+6. **Repeat** — Loops until the target score is met, max iterations (3) reached, or no progress is made
+
+**Auto-fixable** examples: create `llms.txt`, add `alt`/`width`/`height` attributes, add JSON-LD, add `preconnect`, add AI bot rules to `robots.txt`, add `font-display: swap`, add metadata exports.
+
+**Confirm-fix** examples: replace `<img>` with `next/image`, remove unnecessary `'use client'`, add security headers, add `<Suspense>` boundaries.
+
+**Manual** (reported but not attempted): convert SPA to SSR, restructure components, create author pages, add `generateStaticParams`.
 
 ## Scored output
 
@@ -130,11 +149,12 @@ See [`examples/sample-output.md`](examples/sample-output.md) for a full example 
 └─────────────────┘
 
 Reference files (loaded by orchestrator):
-  ├── quality-gates.md    — Scoring rules & weights
-  ├── cwv-thresholds.md   — Core Web Vitals reference
-  ├── nextjs-patterns.md  — Next.js detection rules
-  ├── schema-types.md     — JSON-LD validation (10 types)
-  └── aeo-patterns.md     — AI search readiness patterns
+  ├── quality-gates.md       — Scoring rules & weights
+  ├── cwv-thresholds.md      — Core Web Vitals reference
+  ├── nextjs-patterns.md     — Next.js detection rules
+  ├── schema-types.md        — JSON-LD validation (10 types)
+  ├── aeo-patterns.md        — AI search readiness patterns
+  └── fix-classification.md  — Fix cycle classification rules
 ```
 
 ## Framework support
@@ -192,7 +212,8 @@ web-seo-audit/
 │           ├── cwv-thresholds.md# CWV thresholds & patterns
 │           ├── nextjs-patterns.md# Next.js detection rules
 │           ├── schema-types.md  # JSON-LD validation
-│           └── aeo-patterns.md  # AI search readiness patterns
+│           ├── aeo-patterns.md  # AI search readiness patterns
+│           └── fix-classification.md # Fix cycle classification rules
 ├── agents/
 │   ├── web-seo-technical.md     # Technical SEO agent
 │   ├── web-seo-performance.md   # Performance agent

@@ -1,7 +1,7 @@
 ---
 name: web-seo-audit
 description: Analyze web projects for technical SEO, performance, and AI search readiness. Runs code-level analysis for crawlability, Core Web Vitals, meta tags, structured data, image optimization, AI search readiness (AEO), and framework-specific patterns. Supports Next.js (App Router & Pages Router) with specialized checks.
-argument-hint: "[audit|page <path>|nextjs|cwv|meta|images|aeo|url <url>]"
+argument-hint: "[audit|fix [--target <score>]|page <path>|nextjs|cwv|meta|images|aeo|url <url>]"
 ---
 
 # Tech SEO & Performance Analyzer
@@ -114,6 +114,12 @@ Analyze Next.js patterns: metadata API, Server/Client Components, data fetching,
 Analyze AI search readiness: llms.txt, AI crawler management (8 bots — training vs retrieval), entity-optimized structured data (sameAs, about, dateModified, mainEntityOfPage, speakable, @id), content structure for AI extraction (landmarks, question headings), AI crawlability signals. Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [AEO patterns reference]: {{aeoContent}}.
 ```
 
+### Template: fix
+
+```
+Run iterative fix cycle: audit the project, classify issues by fixability, apply safe fixes, re-audit, repeat until target score ({{targetScore}}) or max iterations ({{maxIterations}}). Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Fix-classification reference]: {{fixClassificationContent}}.
+```
+
 ### Variable Reference
 
 | Variable | Source | Description |
@@ -128,6 +134,9 @@ Analyze AI search readiness: llms.txt, AI crawler management (8 bots — trainin
 | `{{cwvContent}}` | `references/cwv-thresholds.md` | Full content of CWV thresholds reference |
 | `{{nextjsPatternsContent}}` | `references/nextjs-patterns.md` | Full content of Next.js patterns reference |
 | `{{aeoContent}}` | `references/aeo-patterns.md` | Full content of AEO patterns reference |
+| `{{fixClassificationContent}}` | `references/fix-classification.md` | Full content of fix classification reference |
+| `{{targetScore}}` | User argument or default | Target score for fix cycle (default: 80) |
+| `{{maxIterations}}` | Default | Maximum fix-audit iterations (default: 3) |
 
 ## Command Routing
 
@@ -165,6 +174,105 @@ Runs a comprehensive audit across all categories. This is the default command.
 6. Deduplicate cross-category issues (see Agent Result Validation > Deduplication)
 7. Calculate scores using quality-gates.md rules (only for categories with valid data)
 8. Compile the unified report (see Report Format below)
+
+### `fix [--target <score>]` — Iterative Fix Cycle
+
+Runs the full audit, then automatically applies safe fixes and re-audits until the target score is reached or no more progress can be made. Default target score is 80 (PASS threshold). Example: `/web-seo-audit fix --target 90`.
+
+**Steps**:
+
+1. **Parse arguments** — Extract target score from `--target <score>` (default: 80, range: 1-100). Set `maxIterations = 3`.
+
+2. **Initial Audit** — Run the full `audit` flow (steps 1-8 above). Record the initial overall score and per-category scores. If the score already >= target, report "Score {score}/100 already meets target {target}. No fixes needed." and stop.
+
+3. **Load Fix Classification** — Read `references/fix-classification.md` for the classification matrix and application rules.
+
+4. **Classify Issues** — For each issue from the audit:
+   - Use the **Fixability** field from the agent output (auto-fix / confirm-fix / manual)
+   - Cross-reference against the fix-classification matrix to validate the classification
+   - Bucket issues into three lists: `autoFixes`, `confirmFixes`, `manualIssues`
+   - Sort each list by priority: CRITICAL first, then HIGH, MEDIUM, LOW
+
+5. **Present Fix Plan** — Show the user a summary table before applying any changes:
+   ```
+   ## Fix Plan
+
+   | Type | Count | Estimated Impact |
+   |------|-------|-----------------|
+   | Auto-fix (apply directly) | {n} | ~{points} points |
+   | Confirm-fix (ask first) | {n} | ~{points} points |
+   | Manual (report only) | {n} | ~{points} points |
+
+   **Current score**: {score}/100 → **Estimated after fixes**: ~{estimated}/100
+   **Target**: {target}/100
+   ```
+
+   If there are no auto-fix or confirm-fix issues, report "No auto-fixable issues found. Remaining {n} issues require manual intervention:" followed by the manual issues list, then stop.
+
+6. **Apply Fixes** — Process fixable issues (CRITICAL → HIGH → MEDIUM → LOW):
+
+   **For auto-fix issues**:
+   - Group all fixes targeting the same file
+   - Read the target file
+   - Verify the "Before" code from the issue matches the actual file content
+   - If match: apply the fix using the Edit tool (or Write for new files)
+   - If no match: mark as "failed — code mismatch", skip
+   - Apply fixes bottom-to-top within each file (reverse line order) to avoid offset drift
+
+   **For confirm-fix issues**:
+   - Show the user the proposed change (file, before/after code)
+   - Ask for confirmation using AskUserQuestion
+   - If confirmed: apply using Edit/Write tools
+   - If declined: mark as "skipped — user declined"
+
+   **For new files** (llms.txt, robots.ts, sitemap.ts):
+   - Verify the file doesn't already exist
+   - Use the Write tool to create
+
+   Track results: `applied`, `failed`, `skipped` counts.
+
+7. **Re-audit** — Run the full `audit` flow again on the modified codebase. Record the new overall score and per-category scores.
+
+8. **Show Delta** — Display a comparison:
+   ```
+   ## Fix Cycle {iteration} Results
+
+   | Category | Before | After | Change |
+   |----------|--------|-------|--------|
+   | Technical SEO | {before}/100 | {after}/100 | {+/-delta} |
+   | Performance | {before}/100 | {after}/100 | {+/-delta} |
+   | ... | ... | ... | ... |
+   | **Overall** | **{before}/100** | **{after}/100** | **{+/-delta}** |
+
+   Fixes applied: {n} | Failed: {n} | Skipped: {n}
+   ```
+
+9. **Loop Decision** — Stop if ANY of these conditions are met:
+   - Score >= target → "Target score reached!"
+   - Iteration count >= maxIterations → "Maximum iterations ({maxIterations}) reached."
+   - No fixes were applied in this iteration → "No progress — all remaining issues require manual fixes."
+   - Score decreased compared to previous iteration → "Score decreased ({before} → {after}). Stopping to avoid regression."
+
+   If none met, loop back to step 4 (classify issues from the new audit, which may find new issues or confirm previous fixes resolved problems).
+
+10. **Final Report** — After the loop ends, compile a summary:
+    ```
+    ## Fix Cycle Complete
+
+    **Score**: {initialScore}/100 ({initialGrade}) → {finalScore}/100 ({finalGrade})
+    **Iterations**: {count}
+    **Fixes applied**: {totalApplied}
+    **Fixes failed**: {totalFailed}
+    **Fixes skipped**: {totalSkipped}
+
+    ### Files Modified
+    - `file/path.tsx` — {n} fixes applied
+    - `file/path2.tsx` — {n} fixes applied
+    - ...
+
+    ### Remaining Manual Issues ({count})
+    {List all manual issues with priority, location, and description}
+    ```
 
 ### `page <path>` — Single Page Analysis
 

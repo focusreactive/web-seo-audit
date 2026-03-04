@@ -44,6 +44,7 @@ for f in \
     "skills/web-seo-audit/references/nextjs-patterns.md" \
     "skills/web-seo-audit/references/schema-types.md" \
     "skills/web-seo-audit/references/aeo-patterns.md" \
+    "skills/web-seo-audit/references/fix-classification.md" \
     "agents/web-seo-technical.md" \
     "agents/web-seo-performance.md" \
     "agents/web-seo-nextjs.md" \
@@ -68,6 +69,7 @@ cp "$SOURCE_DIR/skills/web-seo-audit/references/cwv-thresholds.md"  "$SKILL_DIR/
 cp "$SOURCE_DIR/skills/web-seo-audit/references/nextjs-patterns.md" "$SKILL_DIR/references/nextjs-patterns.md"
 cp "$SOURCE_DIR/skills/web-seo-audit/references/schema-types.md"    "$SKILL_DIR/references/schema-types.md"
 cp "$SOURCE_DIR/skills/web-seo-audit/references/aeo-patterns.md"   "$SKILL_DIR/references/aeo-patterns.md"
+cp "$SOURCE_DIR/skills/web-seo-audit/references/fix-classification.md" "$SKILL_DIR/references/fix-classification.md"
 
 # ─── Install agents ──────────────────────────────────────────────────
 info "Installing agents to $AGENT_DIR ..."
@@ -87,6 +89,7 @@ for f in \
     "$SKILL_DIR/references/nextjs-patterns.md" \
     "$SKILL_DIR/references/schema-types.md" \
     "$SKILL_DIR/references/aeo-patterns.md" \
+    "$SKILL_DIR/references/fix-classification.md" \
     "$AGENT_DIR/web-seo-technical.md" \
     "$AGENT_DIR/web-seo-performance.md" \
     "$AGENT_DIR/web-seo-nextjs.md" \
@@ -109,13 +112,14 @@ success "Installed and verified successfully!"
 printf "\n"
 printf "  ${BOLD}Installed files:${RESET}\n"
 printf "  ${DIM}Skill${RESET}   %s/SKILL.md\n" "$SKILL_DIR"
-printf "  ${DIM}Refs${RESET}    %s/references/ (5 files)\n" "$SKILL_DIR"
+printf "  ${DIM}Refs${RESET}    %s/references/ (6 files)\n" "$SKILL_DIR"
 printf "  ${DIM}Agents${RESET}  %s/web-seo-*.md (4 files)\n" "$AGENT_DIR"
 printf "\n"
 printf "  ${BOLD}Usage:${RESET}\n"
 printf "    Open Claude Code in any web project and run:\n"
 printf "\n"
 printf "    ${GREEN}/web-seo-audit${RESET}             Full audit with scored report\n"
+printf "    ${GREEN}/web-seo-audit fix${RESET}          Audit, auto-fix, re-audit cycle\n"
 printf "    ${GREEN}/web-seo-audit nextjs${RESET}      Next.js-specific deep check\n"
 printf "    ${GREEN}/web-seo-audit cwv${RESET}         Core Web Vitals focus\n"
 printf "    ${GREEN}/web-seo-audit meta${RESET}        Meta tags & structured data\n"

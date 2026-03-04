@@ -312,6 +312,8 @@ glob: next.config.{js,mjs,ts}
 
 Return findings as a structured list of issues following the quality-gates format provided by the orchestrator in your agent prompt.
 
+For each issue, include a **Fixability** classification (`auto-fix`, `confirm-fix`, or `manual`) based on the fix-classification rules in the quality-gates reference.
+
 Report under the **Next.js Patterns** category:
 - Router type detected (App Router / Pages Router / Both)
 - Next.js version

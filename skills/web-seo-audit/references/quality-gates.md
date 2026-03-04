@@ -164,12 +164,13 @@ Every issue MUST follow this structure:
 - **Problem**: What is wrong and why it matters
 - **Impact**: How this affects SEO, performance, or user experience
 - **Fix**: Specific code change or action to resolve
+- **Fixability**: auto-fix | confirm-fix | manual
 
 <details>
 <summary>Code example</summary>
 
 \`\`\`tsx
-// Before (problematic)
+// Before (problematic) — file/path.tsx:42-48
 ...
 
 // After (fixed)

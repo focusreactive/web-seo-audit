@@ -171,6 +171,8 @@ Check configuration files for security-relevant settings:
 
 Return findings as a structured list of issues following the quality-gates format provided by the orchestrator in your agent prompt.
 
+For each issue, include a **Fixability** classification (`auto-fix`, `confirm-fix`, or `manual`) based on the fix-classification rules in the quality-gates reference.
+
 Group issues under two categories:
 1. **Technical SEO Issues**
 2. **Meta & Structured Data Issues**
