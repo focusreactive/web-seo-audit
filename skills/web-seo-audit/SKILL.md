@@ -1,7 +1,7 @@
 ---
 name: web-seo-audit
 description: Analyze web projects for technical SEO, performance, and AI search readiness. Runs code-level analysis for crawlability, Core Web Vitals, meta tags, structured data, image optimization, AI search readiness (AEO), and framework-specific patterns. Supports Next.js (App Router & Pages Router) with specialized checks.
-argument-hint: "[audit|fix [--target <score>]|page <path>|nextjs|cwv|meta|images|aeo|url <url>]"
+argument-hint: "[audit|fix [--target <score>]|page <path>|nextjs|cwv|meta|images|aeo|perf] [<url>]"
 ---
 
 # Tech SEO & Performance Analyzer
@@ -138,13 +138,71 @@ Run iterative fix cycle: audit the project, classify issues by fixability, apply
 | `{{targetScore}}` | User argument or default | Target score for fix cycle (default: 80) |
 | `{{maxIterations}}` | Default | Maximum fix-audit iterations (default: 3) |
 
+## URL Argument Protocol
+
+Most commands accept an optional `<url>` argument. When provided, live website analysis is performed alongside code-level analysis and the results are correlated.
+
+### URL Validation (shared across all commands)
+
+1. Verify the URL starts with `http://` or `https://`. If not, prepend `https://` and inform the user.
+2. Reject obviously invalid URLs (no domain, localhost, IP addresses in private ranges).
+
+### Fetching Mechanisms
+
+Two mechanisms are used depending on what data is needed:
+
+| Mechanism | Tool | Use case |
+|-----------|------|----------|
+| **HTML analysis** | WebFetch | Retrieve rendered HTML for meta tags, structured data, images, semantic structure, AEO signals |
+| **Performance data** | Bash curl to PageSpeed Insights API | CrUX field data + Lighthouse lab scores. No API key needed. |
+
+**PSI API call pattern**:
+```bash
+curl -s "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={encoded_url}&strategy={mobile|desktop}&category=performance"
+```
+
+### Error Handling (shared)
+
+**WebFetch errors**:
+- Timeout / DNS error / connection refused: Report "Could not fetch URL: {error}. Verify the URL is accessible and try again." — continue with code-level results only.
+- Non-HTML response: Report "The URL returned {content-type} content. Live analysis requires an HTML page." — continue with code-level results only.
+- Redirect: Note the redirect chain and analyze the final destination.
+
+**PSI API errors**:
+- Network failure (curl exit code ≠ 0): Report "Could not reach PageSpeed Insights API." — continue with code-level results only.
+- HTTP 429: Report "API rate limit reached. Wait a minute and try again." — continue with code-level results only.
+- HTTP 400 / invalid URL: Report "PageSpeed Insights could not analyze this URL." — continue with code-level results only.
+- Missing `.lighthouseResult`: Report "Unexpected API response." — continue with code-level results only.
+
+**Key principle**: Live data failure never blocks the report. Always present code-level results and note that live data was unavailable.
+
+### CrUX Data Extraction (shared for commands using PSI)
+
+From the PSI mobile response:
+1. Check `.loadingExperience.metrics` first (URL-level data)
+2. If absent, fall back to `.originLoadingExperience.metrics` (origin-level) — note: "Using origin-level data — URL does not have enough traffic for URL-level CrUX data"
+3. If neither exists: "No CrUX field data available — this site may not have enough Chrome user traffic for field metrics"
+4. For each metric: extract `.percentile` (p75), `.category` (FAST/AVERAGE/SLOW), `.distributions`
+
+Format values for readability: LCP/FCP in seconds (÷1000), INP/TTFB in ms, CLS as decimal. Round to 1 decimal place.
+
+### Correlation Framework
+
+When both code-level and live data are available, classify each finding:
+
+| Category | Meaning | Action |
+|----------|---------|--------|
+| **Confirmed** | Code pattern flagged as risky AND live data shows the problem | Fix immediately — real users are affected |
+| **Hidden** | Live data shows a problem but no code pattern found | Likely infrastructure, CDN, or third-party — investigate beyond code |
+| **Latent risk** | Code pattern flagged as risky but live data is healthy | Fix proactively — prevents future regression |
+
 ## Command Routing
 
 Parse the argument to determine which subcommand to run. If no argument is provided, default to `audit`.
 
-### `audit` — Full SEO Audit
+### `audit [<url>]` — Full SEO Audit
 
-Runs a comprehensive audit across all categories. This is the default command.
+Runs a comprehensive audit across all categories. This is the default command. When a URL is provided, also performs live website analysis and correlates with code findings.
 
 **Steps**:
 
@@ -170,10 +228,19 @@ Runs a comprehensive audit across all categories. This is the default command.
    Agent: web-seo-nextjs       — Template: nextjs
    ```
 
+   **If URL provided** — run these in parallel with the agents:
+   - **WebFetch** the URL for HTML analysis (meta tags, structured data, images, headings, AEO signals)
+   - **PSI mobile** curl for CrUX field data + Lighthouse scores
+   - **PSI desktop** curl for desktop Lighthouse scores
+
 5. Collect results from all agents and validate completeness (see Agent Result Validation)
 6. Deduplicate cross-category issues (see Agent Result Validation > Deduplication)
 7. Calculate scores using quality-gates.md rules (only for categories with valid data)
-8. Compile the unified report (see Report Format below)
+8. **If URL provided** — correlate code findings with live data using the Correlation Framework (Confirmed / Hidden / Latent Risk). Add a "Live Website Correlation" section to the report after the score table showing:
+   - CrUX Field Data table (p75 values, ratings, distributions)
+   - Lighthouse Lab Scores table (mobile + desktop)
+   - Correlation summary: confirmed issues, hidden issues, latent risks
+9. Compile the unified report (see Report Format below)
 
 ### `fix [--target <score>]` — Iterative Fix Cycle
 
@@ -301,9 +368,9 @@ Analyze a specific page/route file for SEO issues.
 
 Do NOT spawn agents for single page analysis — do this inline.
 
-### `nextjs` — Next.js Deep Check
+### `nextjs [<url>]` — Next.js Deep Check
 
-Run the Next.js-specific agent for a detailed framework audit.
+Run the Next.js-specific agent for a detailed framework audit. When a URL is provided, also checks the live site for Next.js-specific patterns.
 
 **Steps**:
 1. Verify this is a Next.js project (abort with message if not)
@@ -313,11 +380,16 @@ Run the Next.js-specific agent for a detailed framework audit.
    ```
    Agent: web-seo-nextjs — Use Template: nextjs. Run a comprehensive audit covering all Next.js-specific patterns.
    ```
-5. Present results with Next.js Patterns score
+5. **If URL provided** — WebFetch the URL (in parallel with agent) and check:
+   - Response headers: `x-powered-by`, cache-control, CDN headers
+   - Rendered HTML: metadata tags rendered correctly, Server Component output vs Client Component hydration markers
+   - Static vs dynamic rendering indicators
+   - Correlate with code findings using the Correlation Framework
+6. Present results with Next.js Patterns score. If URL was provided, include a "Live Site Checks" section with header analysis and code ↔ live correlation.
 
-### `cwv` — Core Web Vitals Focus
+### `cwv [<url>]` — Core Web Vitals Focus
 
-Analyze code patterns affecting Core Web Vitals.
+Analyze code patterns affecting Core Web Vitals. When a URL is provided, also fetches CrUX field data for the three core metrics (LCP, INP, CLS).
 
 **Steps**:
 1. Run framework detection and source root detection
@@ -326,11 +398,12 @@ Analyze code patterns affecting Core Web Vitals.
    ```
    Agent: web-seo-performance — Use Template: performance, narrowed to CWV risk assessment. Include per-metric risk levels with specific file locations and code fixes.
    ```
-4. Present results with CWV Risk Assessment table and Performance score
+4. **If URL provided** — fetch PSI mobile data (in parallel with agent) using curl. Extract CrUX field data for core metrics only (LCP, INP, CLS). Correlate each metric's code-level risk with its field rating using the Correlation Framework.
+5. Present results with CWV Risk Assessment table and Performance score. If URL was provided, add CrUX field data alongside each code-level risk assessment and show correlation (Confirmed / Hidden / Latent Risk per metric).
 
-### `meta` — Meta Tags & Structured Data
+### `meta [<url>]` — Meta Tags & Structured Data
 
-Check meta tags, Open Graph, Twitter Cards, and JSON-LD structured data.
+Check meta tags, Open Graph, Twitter Cards, and JSON-LD structured data. When a URL is provided, also checks the rendered HTML to verify tags are present in the live page.
 
 **Steps**:
 1. Run framework detection and source root detection
@@ -339,11 +412,17 @@ Check meta tags, Open Graph, Twitter Cards, and JSON-LD structured data.
    ```
    Agent: web-seo-technical — Use Template: technical, narrowed to meta tags and structured data analysis. Validate schema types against schema.org requirements.
    ```
-4. Present results with Meta & Structured Data score
+4. **If URL provided** — WebFetch the URL (in parallel with agent) and check rendered HTML for:
+   - Title tag and meta description actually rendered
+   - Open Graph and Twitter Card tags present in `<head>`
+   - Canonical URL matches expected value
+   - JSON-LD blocks valid and complete in rendered output
+   - Correlate: code defines metadata but is it rendering correctly?
+5. Present results with Meta & Structured Data score. If URL was provided, add a "Live vs Code Comparison" table showing which meta tags are defined in code vs actually rendered, highlighting any mismatches.
 
-### `images` — Image Optimization
+### `images [<url>]` — Image Optimization
 
-Check image optimization across the project.
+Check image optimization across the project. When a URL is provided, also checks rendered image attributes on the live page.
 
 **Steps**:
 1. Run framework detection and source root detection
@@ -352,11 +431,19 @@ Check image optimization across the project.
    ```
    Agent: web-seo-performance — Use Template: performance, narrowed to image optimization analysis. Check formats, sizing, lazy loading, alt attributes, responsive images, and above-the-fold priorities.
    ```
-4. Present results with Image Optimization score
+4. **If URL provided** — WebFetch the URL (in parallel with agent) and check rendered HTML for:
+   - Images with/without `alt` attributes
+   - Images with/without `width`/`height` or `aspect-ratio`
+   - Image formats served (WebP/AVIF vs legacy PNG/JPG)
+   - Lazy loading attributes (`loading="lazy"` vs `loading="eager"`)
+   - `fetchpriority` on above-the-fold images
+   - Responsive image attributes (`srcset`, `sizes`)
+   - Correlate: code uses `next/image` but are optimized attributes present in rendered HTML?
+5. Present results with Image Optimization score. If URL was provided, add a "Live Image Audit" section showing rendered image stats and any discrepancies between code and rendered output.
 
-### `aeo` — AI Search Readiness
+### `aeo [<url>]` — AI Search Readiness
 
-Analyze the project for AI search engine optimization (AEO).
+Analyze the project for AI search engine optimization (AEO). When a URL is provided, also checks the live site for AI search signals.
 
 **Steps**:
 1. Run framework detection and source root detection
@@ -365,45 +452,173 @@ Analyze the project for AI search engine optimization (AEO).
    ```
    Agent: web-seo-aeo — Use Template: aeo. Run a comprehensive AI search readiness audit covering all AEO patterns.
    ```
-4. Present results with AI Search Readiness score
+4. **If URL provided** — run these in parallel with the agent:
+   - **WebFetch the URL** and check rendered HTML for: `<main>` landmark, semantic heading structure, question-format headings, entity-optimized JSON-LD (sameAs, @id, mainEntityOfPage), FAQPage/HowTo schemas, speakable markup
+   - **WebFetch `{origin}/robots.txt`** and check for AI bot rules (GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, Applebot, Google-Extended, CCBot, Bytespider)
+   - **WebFetch `{origin}/llms.txt`** and check if it exists and contains structured content
+   - Correlate: code creates these signals but are they rendering/deployed correctly?
+5. Present results with AI Search Readiness score. If URL was provided, add a "Live AEO Signals" section showing which signals are present on the live site, and highlight any gaps between code and deployed state.
 
-### `url <url>` — Live URL Quick-Check
+### `perf [<url>]` — Performance Analysis
 
-Fetch and analyze a live URL. This is supplementary to code analysis.
+Analyze performance from code and — when a URL is provided — correlate with real-world field data from PageSpeed Insights.
+
+**Two modes**:
+- `perf` (no URL) — **Repo only**: code-level CWV analysis of the project source
+- `perf <url>` — **Repo + Live**: code-level analysis PLUS CrUX field data and Lighthouse lab scores from PageSpeed Insights
+
+#### Mode 1: Repo Only (`perf` with no URL)
 
 **Steps**:
+
+1. Run framework detection and source root detection
+2. Load `references/cwv-thresholds.md` and `references/quality-gates.md`
+3. Spawn agent:
+   ```
+   Agent: web-seo-performance — Use Template: performance, narrowed to CWV risk assessment. Include per-metric risk levels with specific file locations and code fixes.
+   ```
+4. Present results with:
+   - CWV Risk Assessment table (LCP / INP / CLS risk levels with key factors)
+   - Performance score
+   - All issues sorted by priority with file paths and fixes
+   - CTA: "Run `/web-seo-audit perf <url>` to compare these code patterns against real-world field data."
+
+#### Mode 2: Repo + Live (`perf <url>`)
+
+Run code-level analysis AND fetch live performance data, then correlate the findings.
+
+**Steps**:
+
 1. **Validate the URL**:
-   1.1. Check that a URL argument was provided. If missing, respond: "Please provide a URL to analyze. Example: `/web-seo-audit url https://example.com`"
-   1.2. Verify the URL starts with `http://` or `https://`. If not, prepend `https://` and inform the user
-   1.3. Reject obviously invalid URLs (no domain, localhost, IP addresses in private ranges)
-2. Inform the user this is a basic analysis — for full audits, use code-level `audit`
-3. Use WebFetch to retrieve the URL. **Handle errors**:
-   - If WebFetch fails (timeout, DNS error, connection refused): Report "Could not fetch URL: {error}. Verify the URL is accessible and try again."
-   - If the response is not HTML (e.g., JSON, image, PDF): Report "The URL returned {content-type} content. This command analyzes HTML pages. For API endpoints or non-HTML resources, use code-level analysis instead."
-   - If the URL redirects: Note the redirect chain and analyze the final destination
-4. Analyze the returned HTML for:
-   - Title tag and meta description
-   - Open Graph and Twitter Card tags
-   - Canonical URL
-   - Structured data (JSON-LD blocks)
-   - Image alt attributes
-   - Heading hierarchy
-   - Internal/external link patterns
-   - Resource hints (preload, preconnect)
-5. Calculate a **Quick-Check Score** (0-100) using these 4 categories:
+   1.1. Verify the URL starts with `http://` or `https://`. If not, prepend `https://` and inform the user
+   1.2. Reject obviously invalid URLs (no domain, localhost, IP addresses in private ranges)
 
-   | Category | Weight | Checks |
-   |----------|--------|--------|
-   | Meta Tags | 35% | Title present/length, description present/length, viewport, charset |
-   | Structured Data | 25% | JSON-LD present, @context valid, required fields |
-   | Accessibility Basics | 20% | alt text on images, heading hierarchy, lang attribute |
-   | Resource Hints | 20% | preconnect/preload present, async/defer on scripts |
+2. **Run code-level analysis and PSI fetches in parallel**:
 
-   Apply the same deduction scale as the full audit: CRITICAL -15, HIGH -8, MEDIUM -3, LOW -1. Floor at 0.
+   **Code-level** (same as Mode 1):
+   - Run framework detection and source root detection
+   - Load `references/cwv-thresholds.md` and `references/quality-gates.md`
+   - Spawn agent:
+     ```
+     Agent: web-seo-performance — Use Template: performance, narrowed to CWV risk assessment. Include per-metric risk levels with specific file locations and code fixes.
+     ```
 
-   Present the result as **"Quick-Check Score: {score}/100"** — distinct from the full audit's "SEO Health Score".
+   **PSI mobile fetch** via Bash curl (run in parallel with the agent):
+   ```bash
+   curl -s "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={encoded_url}&strategy=mobile&category=performance"
+   ```
 
-   > *This is a surface-level check of rendered HTML. Run `/web-seo-audit` on your source code for a comprehensive code-level analysis.*
+   **PSI desktop fetch** via Bash curl (run in parallel with the agent):
+   ```bash
+   curl -s "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={encoded_url}&strategy=desktop&category=performance"
+   ```
+
+   **Handle PSI errors**:
+   - Network failure (curl exit code ≠ 0): Report "Could not reach PageSpeed Insights API. Check your network connection." — continue with code-level results only
+   - HTTP 429: Report "API rate limit reached. Wait a minute and try again." — continue with code-level results only
+   - HTTP 400 / invalid URL in response: Report "PageSpeed Insights could not analyze this URL. Verify it is publicly accessible." — continue with code-level results only
+   - Response missing `.lighthouseResult`: Report "Unexpected API response." — continue with code-level results only
+
+   If PSI fails, present Mode 1 results and note: "Live data unavailable — showing code-level analysis only."
+
+3. **Extract CrUX field data** from the mobile PSI response:
+   - Check `.loadingExperience.metrics` first (URL-level data)
+   - If absent or empty, fall back to `.originLoadingExperience.metrics` (origin-level) and note: "Using origin-level data — URL does not have enough traffic for URL-level CrUX data"
+   - If neither exists: report "No CrUX field data available — this site may not have enough Chrome user traffic for field metrics"
+   - For each available metric (LARGEST_CONTENTFUL_PAINT_MS, INTERACTION_TO_NEXT_PAINT, CUMULATIVE_LAYOUT_SHIFT, FIRST_CONTENTFUL_PAINT_MS, EXPERIMENTAL_TIME_TO_FIRST_BYTE):
+     - Extract `.percentile` (p75 value)
+     - Extract `.category` (FAST / AVERAGE / SLOW)
+     - Extract `.distributions` array (proportions for good / needs-improvement / poor)
+
+4. **Extract Lighthouse lab scores** from `.lighthouseResult` (both mobile and desktop):
+   - Overall performance score: `.categories.performance.score` × 100
+   - Individual audit values:
+     - LCP: `.audits["largest-contentful-paint"].numericValue`
+     - CLS: `.audits["cumulative-layout-shift"].numericValue`
+     - TBT: `.audits["total-blocking-time"].numericValue`
+     - FCP: `.audits["first-contentful-paint"].numericValue`
+     - Speed Index: `.audits["speed-index"].numericValue`
+
+5. **Extract top opportunities** from `.lighthouseResult.audits` in the mobile response:
+   - Filter audits where `.score` is not null and `.score < 1`
+   - Sort by `.score` ascending (worst first)
+   - Include up to 10 opportunities with: audit title, score, displayValue (savings estimate)
+
+6. **Correlate code-level findings with live data**:
+   - For each CWV metric (LCP, INP/TBT, CLS), match the code-level risk assessment against the field/lab result
+   - Highlight **confirmed issues**: code pattern flagged as risky AND field data shows AVERAGE/SLOW
+   - Highlight **hidden issues**: field data shows AVERAGE/SLOW but no code pattern found (may be infrastructure, CDN, or third-party related)
+   - Highlight **latent risks**: code pattern flagged as risky but field data is FAST (fix before it regresses)
+
+7. **Present the combined report**:
+
+   ```markdown
+   # Performance Report: {project name}
+
+   **Date**: {current date}
+   **URL analyzed**: {url}
+   **Data sources**: Code analysis + CrUX field data + Lighthouse lab data
+
+   ---
+
+   ## CrUX Field Data (Real Users) — {URL-level | Origin-level}
+
+   | Metric | p75 Value | Rating | Good | Needs Improvement | Poor |
+   |--------|-----------|--------|------|-------------------|------|
+   | LCP | {value}s | {FAST/AVERAGE/SLOW} | {%} | {%} | {%} |
+   | INP | {value}ms | {FAST/AVERAGE/SLOW} | {%} | {%} | {%} |
+   | CLS | {value} | {FAST/AVERAGE/SLOW} | {%} | {%} | {%} |
+   | FCP | {value}s | {FAST/AVERAGE/SLOW} | {%} | {%} | {%} |
+   | TTFB | {value}ms | {FAST/AVERAGE/SLOW} | {%} | {%} | {%} |
+
+   **Overall CWV Assessment**: {PASS if LCP + INP + CLS all FAST, else FAIL}
+
+   ---
+
+   ## Lighthouse Lab Scores
+
+   | Metric | Mobile | Desktop |
+   |--------|--------|---------|
+   | Performance Score | {score}/100 | {score}/100 |
+   | LCP | {value}s | {value}s |
+   | CLS | {value} | {value} |
+   | TBT | {value}ms | {value}ms |
+   | FCP | {value}s | {value}s |
+   | Speed Index | {value}s | {value}s |
+
+   ---
+
+   ## Code ↔ Field Correlation
+
+   ### Confirmed Issues
+   Code patterns causing real-world impact:
+   {List issues where code risk matches field AVERAGE/SLOW, with file paths and fixes}
+
+   ### Hidden Issues
+   Field data problems not visible in code (infrastructure, CDN, third-party):
+   {List metrics that are AVERAGE/SLOW but have no matching code pattern}
+
+   ### Latent Risks
+   Code patterns that haven't impacted field data yet:
+   {List code issues where field data is still FAST — fix before regression}
+
+   ---
+
+   ## Top Lighthouse Opportunities
+
+   | Opportunity | Potential Savings |
+   |-------------|-------------------|
+   | {audit title} | {displayValue} |
+   | ... | ... |
+
+   ---
+
+   ## All Code-Level Issues
+
+   {Full issue list from the performance agent, sorted by priority}
+   ```
+
+   Format CrUX values for readability: LCP/FCP in seconds (÷1000), INP/TTFB in ms, CLS as decimal. Round to 1 decimal place. Map CrUX categories to visual indicators: FAST = Good, AVERAGE = Needs Improvement, SLOW = Poor.
 
 ## Agent Result Validation
 

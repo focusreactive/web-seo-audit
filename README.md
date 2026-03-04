@@ -4,7 +4,7 @@
 
 Most SEO tools audit a live URL after you've shipped. This plugin reads your source code *before* you deploy — catching missing meta tags, broken structured data, image issues, and AI search gaps while you're still in your editor.
 
-A Claude Code plugin. No browser, no Lighthouse, no dev server, no live URLs needed.
+A Claude Code plugin. No browser, no dev server needed. Optionally add a URL to any command for live website analysis — CrUX field data, Lighthouse scores, and rendered HTML checks — correlated with code findings.
 
 ```
 SEO Health Score: 88/100 (B+) — PASS
@@ -217,31 +217,35 @@ Fixes applied: 10 | Failed: 0 | Skipped: 2
 
 ## Commands
 
-| Command                          | What it does                                                                |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| `/web-seo-audit`                 | Full audit — all 6 categories, scored report                                |
-| `/web-seo-audit fix`             | Audit, auto-fix issues, re-audit — iterative cycle until target score       |
-| `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80)                            |
-| `/web-seo-audit nextjs`          | Next.js deep check — metadata API, Server Components, data fetching         |
-| `/web-seo-audit cwv`             | Core Web Vitals focus — LCP, INP, CLS risk analysis                         |
-| `/web-seo-audit meta`            | Meta tags & structured data — title, OG, Twitter, JSON-LD                   |
-| `/web-seo-audit images`          | Image optimization — format, sizing, lazy loading, alt text                 |
-| `/web-seo-audit aeo`             | AI search readiness — llms.txt, AI crawlers, entity data, content structure |
-| `/web-seo-audit page <path>`     | Single page analysis — inline check, no agents spawned                      |
-| `/web-seo-audit url <url>`       | Live URL quick-check — surface-level scored report from rendered HTML       |
+Any command accepts an optional `<url>` at the end — when provided, live website analysis is run alongside code analysis and results are correlated (Confirmed / Hidden / Latent Risk).
+
+| Command                          | What it does                                                    |
+| -------------------------------- | --------------------------------------------------------------- |
+| `/web-seo-audit`                 | Full audit — all 6 categories, scored report                    |
+| `/web-seo-audit fix`             | Audit, auto-fix issues, re-audit — iterative cycle              |
+| `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80)                |
+| `/web-seo-audit nextjs`          | Next.js deep check — metadata API, Server Components            |
+| `/web-seo-audit cwv`             | Core Web Vitals focus — LCP, INP, CLS risk analysis             |
+| `/web-seo-audit meta`            | Meta tags & structured data — title, OG, Twitter, JSON-LD       |
+| `/web-seo-audit images`          | Image optimization — format, sizing, lazy loading, alt text     |
+| `/web-seo-audit aeo`             | AI search readiness — llms.txt, AI crawlers, entity data        |
+| `/web-seo-audit perf`            | Performance analysis — CWV patterns, bundle size, loading       |
+| `/web-seo-audit page <path>`     | Single page analysis — inline check, no agents spawned          |
+
+Example with URL: `/web-seo-audit cwv https://example.com` — code-level CWV analysis + CrUX field data correlation.
 
 ## What it checks
 
-6 categories, 4 specialized agents running in parallel:
+6 categories, 4 specialized agents running in parallel. Every command accepts an optional URL — add one to get live website analysis correlated with code findings:
 
-| Category                   | Checks                                                                                                                                                                               | Agent                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| **Technical SEO**          | robots.txt, sitemap, canonical URLs, meta robots, URL structure, internal linking, security headers, mobile optimization, i18n                                                       | `web-seo-technical`   |
-| **Performance**            | LCP patterns, INP risk, CLS prevention, bundle size, font loading, third-party scripts, caching, compression                                                                         | `web-seo-performance` |
-| **Next.js Patterns**       | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | `web-seo-nextjs`      |
-| **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types)                                                                       | `web-seo-technical`   |
-| **Image Optimization**     | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop                                                                                     | `web-seo-performance` |
-| **AI Search Readiness**    | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals                                             | `web-seo-aeo`         |
+| Category                   | Checks                                                                                                                                                                               | With URL adds                          | Agent                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | --------------------- |
+| **Technical SEO**          | robots.txt, sitemap, canonical URLs, meta robots, URL structure, internal linking, security headers, mobile optimization, i18n                                                       | Live HTML verification                 | `web-seo-technical`   |
+| **Performance**            | LCP patterns, INP risk, CLS prevention, bundle size, font loading, third-party scripts, caching, compression                                                                        | CrUX field data + Lighthouse scores    | `web-seo-performance` |
+| **Next.js Patterns**       | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | Response headers, rendering checks     | `web-seo-nextjs`      |
+| **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types)                                                                       | Rendered meta tag verification         | `web-seo-technical`   |
+| **Image Optimization**     | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop                                                                                     | Rendered image attribute checks        | `web-seo-performance` |
+| **AI Search Readiness**    | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals                                             | Live robots.txt, llms.txt, HTML checks | `web-seo-aeo`         |
 
 ## Framework support
 

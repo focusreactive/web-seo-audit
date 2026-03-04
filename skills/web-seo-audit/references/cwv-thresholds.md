@@ -327,3 +327,66 @@ When analyzing code (not live metrics), use these heuristics to estimate CWV ris
 - Web fonts without `font-display` or `next/font` → MEDIUM risk
 - CSS animations using `top`/`left`/`width`/`height` → MEDIUM risk
 - No skeleton/loading states for async content → MEDIUM risk
+
+---
+
+## Field Data Interpretation (CrUX / PageSpeed Insights)
+
+CrUX (Chrome User Experience Report) provides real-world performance data collected from opted-in Chrome users. The PageSpeed Insights API returns both CrUX field data and Lighthouse lab data in a single response.
+
+### CrUX Assessment Categories
+
+CrUX reports each metric with a category and distribution:
+
+| CrUX Category | Maps To | Meaning |
+|---------------|---------|---------|
+| FAST | Good | p75 is within the "Good" threshold |
+| AVERAGE | Needs Improvement | p75 is between "Good" and "Poor" thresholds |
+| SLOW | Poor | p75 exceeds the "Poor" threshold |
+
+### Overall Core Web Vitals Pass Rule
+
+A URL **passes** Core Web Vitals assessment when all three core metrics meet the "Good" threshold at the 75th percentile:
+
+| Metric | Must be | Threshold |
+|--------|---------|-----------|
+| LCP | FAST | p75 ≤ 2.5s |
+| INP | FAST | p75 ≤ 200ms |
+| CLS | FAST | p75 ≤ 0.1 |
+
+If **any** of the three is AVERAGE or SLOW, the overall assessment is **FAIL**.
+
+### Field vs Lab Data Comparison
+
+| Aspect | Field Data (CrUX) | Lab Data (Lighthouse) |
+|--------|-------------------|----------------------|
+| **Source** | Real Chrome users over 28-day rolling window | Simulated page load in controlled environment |
+| **Conditions** | Varied devices, networks, locations | Fixed device emulation (Moto G Power on 4G for mobile) |
+| **Metrics** | LCP, INP, CLS, FCP, TTFB | LCP, CLS, TBT (proxy for INP), FCP, Speed Index |
+| **Use case** | Understand actual user experience | Debug specific issues, measure impact of changes |
+| **Updates** | Daily (28-day rolling) | Instant (per-run) |
+| **Coverage** | Only sites with sufficient Chrome traffic | Any publicly accessible URL |
+
+> **Note**: Lab data uses TBT (Total Blocking Time) as a proxy for INP. They correlate but are not equivalent — TBT measures total main-thread blocking during load, while INP measures worst-case interaction responsiveness throughout the page lifecycle.
+
+### Distribution Interpretation
+
+CrUX provides the percentage of page loads in each bucket (good / needs-improvement / poor). Even if the p75 is categorized as AVERAGE, a high proportion in the "poor" bucket signals serious issues:
+
+- **>75% Good**: Healthy — most users have a good experience
+- **>25% Poor**: Critical — more than 1 in 4 users hit the "poor" threshold, even if p75 is AVERAGE
+- **Bimodal distribution** (high Good AND high Poor, low middle): Likely a device/network segmentation issue — mobile users on slow connections vs desktop on fast
+
+### URL-Level vs Origin-Level Data
+
+CrUX data is available at two granularities:
+
+| Level | Source field | Description |
+|-------|-------------|-------------|
+| **URL-level** | `.loadingExperience.metrics` | Data for the specific URL — most relevant for per-page analysis |
+| **Origin-level** | `.originLoadingExperience.metrics` | Aggregated data across the entire origin (domain) — broader view |
+
+**Resolution rules**:
+1. **Prefer URL-level data** — it reflects the specific page's real performance
+2. **Fall back to origin-level** if URL-level is absent — note this in the report as "Origin-level (URL lacks sufficient traffic)"
+3. **If neither exists** — the site does not have enough Chrome traffic for CrUX data. Report this clearly and rely on lab data only
