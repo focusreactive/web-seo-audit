@@ -60,6 +60,11 @@ These fixes have a clear solution but could affect behavior, layout, or involve 
 | `dynamic = 'force-dynamic'` on static-eligible pages | Remove or change to ISR with `revalidate` | Changes rendering strategy | Edit |
 | Missing `robots.ts` (has `public/robots.txt`) | Create `app/robots.ts` typed equivalent | Replaces static file with dynamic | Write |
 | Missing `sitemap.ts` (has static sitemap) | Create `app/sitemap.ts` typed equivalent | Replaces static file with dynamic | Write |
+| Barrel file → direct imports | Replace `import { X } from '@/components'` with `import { X } from '@/components/X'` | Changes import paths, may affect other imports | Edit |
+| Icon library root import → subpath import | Replace `from 'react-icons'` with `from 'react-icons/fa'` (specific set) | Changes import path | Edit |
+| Layout fetch without caching | Add `next: { revalidate: N }` to `fetch()` calls in layouts | Changes caching behavior | Edit |
+| Dynamic import → static import for above-fold | Replace `dynamic(() => import(...))` with static `import` for Hero/Header/Nav | Changes bundle splitting | Edit |
+| `getServerSideProps` → `getStaticProps` + `revalidate` | Convert SSR to ISR with revalidation period | Changes rendering strategy, needs `getStaticPaths` | Edit |
 
 ### manual — Requires Architectural Decisions
 
@@ -90,6 +95,13 @@ These issues require human judgment and cannot be safely automated:
 | Add `FAQPage` / `HowTo` schema | Requires identifying and structuring Q&A / tutorial content |
 | Add OG image generation (`opengraph-image.tsx`) | Requires design decisions for image layout and content |
 | Fix non-descriptive anchor text | Requires copywriting decisions |
+| Reduce excessive `'use client'` boundaries | Requires understanding which components need interactivity and restructuring data flow |
+| Restructure Client Component wrappers | Requires understanding component dependencies, may need new component hierarchy |
+| Reduce nested Context Providers | Requires evaluating which providers are needed globally vs locally, possible state consolidation |
+| Remove large inline JSON from pages | Requires deciding data source (API, build-time fetch, separate file) and restructuring |
+| Remove heavy imports from `_app.tsx` | Requires evaluating alternatives and migration to lighter packages or dynamic imports |
+| Optimize excessive dynamic imports | Requires evaluating bundle impact and user flows to decide which splits are valuable |
+| Add `React.memo` to expensive context consumers | Requires profiling to identify truly expensive components and correct memo boundaries |
 
 ## Classification Algorithm
 

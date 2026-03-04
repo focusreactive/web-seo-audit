@@ -458,3 +458,396 @@ When analyzing code, flag patterns that would throw during SSR:
 - Browser-only APIs used in Server Components or during SSR
 
 **Detection**: `grep "window\.|document\." app/**/page.{tsx,jsx} app/**/layout.{tsx,jsx} pages/**/*.{tsx,jsx}` (excluding files with `'use client'` at top)
+
+---
+
+## Performance Antipatterns
+
+These are Next.js-specific performance antipatterns that hurt runtime performance, inflate bundles, or cause unnecessary re-renders. General CWV patterns are covered by `web-seo-performance`; these are framework-specific issues only.
+
+### Excessive `'use client'` Boundaries (App Router)
+
+**Detection**:
+```
+# Count total components in app/ and components/
+glob: app/**/*.{tsx,jsx}
+glob: components/**/*.{tsx,jsx}
+
+# Count Client Components
+grep: "'use client'" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Calculate ratio: `clientComponents / totalComponents`
+- \>60% client components = HIGH — most of the app opts out of Server Components, losing streaming, smaller bundles, and server-side data fetching
+- 40-60% = MEDIUM — review whether some Client Components could be Server Components
+
+**Correct** — push interactivity to leaf components:
+```tsx
+// app/page.tsx — Server Component (no directive)
+import { ProductList } from '@/components/ProductList'; // Server Component
+import { AddToCartButton } from '@/components/AddToCartButton'; // Client Component
+
+export default async function Page() {
+  const products = await getProducts(); // server-side fetch
+  return (
+    <main>
+      <ProductList products={products} />
+    </main>
+  );
+}
+```
+
+**Anti-pattern** — entire page as Client Component:
+```tsx
+// app/page.tsx
+'use client'; // ❌ Makes entire page a Client Component
+import { useState, useEffect } from 'react';
+
+export default function Page() {
+  const [products, setProducts] = useState([]);
+  useEffect(() => { fetch('/api/products').then(…) }, []);
+  return <main>{products.map(…)}</main>;
+}
+```
+
+### Layout-Level Fetch Without Caching (App Router)
+
+**Detection**:
+```
+grep: "fetch(" app/**/layout.{tsx,jsx,ts,js}
+# Then check if matches contain next: { revalidate } or cache:
+grep: "next:\s*\{.*revalidate|cache:" app/**/layout.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- `fetch()` in layouts missing `next: { revalidate }` or `cache` option = HIGH — layouts run on every navigation, uncached fetches add latency to every page transition
+
+**Correct**:
+```tsx
+// app/layout.tsx
+async function getSettings() {
+  const res = await fetch('https://api.example.com/settings', {
+    next: { revalidate: 3600 }, // Cache for 1 hour
+  });
+  return res.json();
+}
+```
+
+**Anti-pattern**:
+```tsx
+// app/layout.tsx
+async function getSettings() {
+  const res = await fetch('https://api.example.com/settings'); // ❌ No caching — re-fetches on every navigation
+  return res.json();
+}
+```
+
+### Barrel File Re-exports (App Router)
+
+**Detection**:
+```
+# Find barrel files
+grep: "export \* from|export \{.*\} from" **/index.{ts,tsx,js,jsx}
+
+# Check if barrel files are imported in Server Components
+grep: "from ['\"]\..*index['\"]|from ['\"]@/" app/**/*.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- `export * from` in index files imported by Server Components = MEDIUM — barrel files defeat tree-shaking, pulling in unnecessary code and potentially pulling Client Components into Server Component bundles
+
+**Correct** — direct imports:
+```tsx
+// app/page.tsx
+import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+```
+
+**Anti-pattern** — barrel file re-export:
+```tsx
+// components/index.ts
+export * from './Button';   // ❌ Pulls in ALL exports
+export * from './Card';
+export * from './HeavyChart'; // Even unused, this gets bundled
+
+// app/page.tsx
+import { Button } from '@/components'; // ❌ Triggers barrel file
+```
+
+### Client Component Wrapping Server Components (App Router)
+
+**Detection**:
+```
+# Find Client Components that accept children
+grep: "'use client'" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+# Then check if those files render {children}
+grep: "\{children\}" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- `'use client'` wrapper that only provides context or event handlers around `{children}` = MEDIUM — forces all children to be Client Components unless explicitly separated. Consider extracting the interactive part.
+
+**Correct** — separate interactive wrapper:
+```tsx
+// components/ThemeProvider.tsx
+'use client';
+import { createContext, useContext, useState } from 'react';
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState('light');
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+}
+
+// app/layout.tsx — Server Component
+import { ThemeProvider } from '@/components/ThemeProvider';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html><body>
+      <ThemeProvider>{children}</ThemeProvider> {/* children remain Server Components */}
+    </body></html>
+  );
+}
+```
+
+**Anti-pattern** — unnecessary client boundary:
+```tsx
+// components/PageWrapper.tsx
+'use client'; // ❌ Makes wrapper and potentially all children Client Components
+
+export function PageWrapper({ children }: { children: React.ReactNode }) {
+  return <div className="page-wrapper">{children}</div>; // No interactivity needed
+}
+```
+
+### Heavy Imports in `_app.tsx` (Pages Router)
+
+**Detection**:
+```
+# Check _app.tsx for heavy libraries at top level
+grep: "moment|import.*lodash[^/]|@mui/material|antd|@chakra-ui" pages/_app.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- Heavy libraries (`moment`, full `lodash`, `@mui/material`, `antd`) imported at the top level of `_app.tsx` = HIGH — these are included in EVERY page's bundle since `_app` wraps all pages
+
+**Correct** — use lighter alternatives or dynamic imports:
+```tsx
+// pages/_app.tsx
+import type { AppProps } from 'next/app';
+// Only import what's truly needed on every page
+import '@/styles/globals.css';
+
+export default function App({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />;
+}
+```
+
+**Anti-pattern**:
+```tsx
+// pages/_app.tsx
+import moment from 'moment'; // ❌ 300KB+ included on every page
+import _ from 'lodash'; // ❌ 70KB+ included on every page
+import { ThemeProvider } from '@mui/material'; // ❌ Pulls in entire MUI
+```
+
+### `getServerSideProps` Overuse (Pages Router)
+
+**Detection**:
+```
+grep: "getServerSideProps" pages/**/*.{tsx,jsx,ts,js}
+# Check if those pages have content that changes infrequently
+```
+
+**Rules**:
+- `getServerSideProps` on pages with content that changes infrequently (blog posts, marketing pages, docs) = MEDIUM — use `getStaticProps` + `revalidate` (ISR) instead for faster TTFB
+
+**Correct** — ISR for infrequently changing content:
+```tsx
+// pages/blog/[slug].tsx
+export async function getStaticProps({ params }) {
+  const post = await getPost(params.slug);
+  return { props: { post }, revalidate: 60 }; // Regenerate every 60s
+}
+
+export async function getStaticPaths() {
+  const posts = await getAllPosts();
+  return {
+    paths: posts.map((p) => ({ params: { slug: p.slug } })),
+    fallback: 'blocking',
+  };
+}
+```
+
+**Anti-pattern**:
+```tsx
+// pages/blog/[slug].tsx
+export async function getServerSideProps({ params }) { // ❌ SSR on every request
+  const post = await getPost(params.slug);
+  return { props: { post } };
+}
+```
+
+### Excessive Dynamic Imports (Both Routers)
+
+**Detection**:
+```
+grep: "dynamic\(|React\.lazy\(" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- \>10 `dynamic()` / `React.lazy()` calls project-wide = MEDIUM — excessive code splitting creates too many network requests, increasing load time instead of reducing it
+
+### Dynamic Imports for Above-the-Fold Components (Both Routers)
+
+**Detection**:
+```
+# Check if Hero, Header, Nav, Banner, or similar components use dynamic imports
+grep: "dynamic\(.*Hero|dynamic\(.*Header|dynamic\(.*Nav|dynamic\(.*Banner|lazy\(.*Hero|lazy\(.*Header|lazy\(.*Nav" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Above-the-fold components (Hero, Header, Nav, Banner) loaded via `dynamic()` or `React.lazy()` = HIGH — delays LCP since the component isn't in the initial bundle
+
+**Correct**:
+```tsx
+// app/page.tsx
+import { Hero } from '@/components/Hero'; // ✅ Static import for above-fold
+
+export default function Page() {
+  return <Hero />;
+}
+```
+
+**Anti-pattern**:
+```tsx
+// app/page.tsx
+import dynamic from 'next/dynamic';
+const Hero = dynamic(() => import('@/components/Hero')); // ❌ Delays LCP
+
+export default function Page() {
+  return <Hero />;
+}
+```
+
+### Too Many Nested Context Providers (Both Routers)
+
+**Detection**:
+```
+# In App Router: check root layout
+grep: "Provider" app/layout.{tsx,jsx}
+
+# In Pages Router: check _app
+grep: "Provider" pages/_app.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- \>5 nested Context Providers in root layout or `_app` = HIGH — deep provider nesting causes cascading re-renders when any context value changes
+- 3-5 providers = MEDIUM — consider consolidating or lazy-loading providers
+
+**Correct** — consolidate providers:
+```tsx
+// app/providers.tsx
+'use client';
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+```
+
+**Anti-pattern**:
+```tsx
+// app/layout.tsx
+export default function RootLayout({ children }) {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <I18nProvider>
+          <AnalyticsProvider>
+            <FeatureFlagProvider>
+              <ToastProvider> {/* ❌ 6+ nested providers */}
+                {children}
+              </ToastProvider>
+            </FeatureFlagProvider>
+          </AnalyticsProvider>
+        </I18nProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+```
+
+### Large Inline JSON in Pages (Both Routers)
+
+**Detection**:
+```
+# Look for large object/array literals in page files
+grep: "const .* = \[|const .* = \{" app/**/page.{tsx,jsx} pages/**/*.{tsx,jsx}
+# Manual check: flag objects/arrays > ~50 lines or containing hardcoded data
+```
+
+**Rules**:
+- Large data objects (>50 items or >50 lines) inlined in page components = MEDIUM — inflates the JavaScript bundle sent to the client. Move data to a separate file, API endpoint, or fetch at build time.
+
+**Correct**:
+```tsx
+// data/countries.ts (separate file)
+export const countries = [...]; // Data file, can be tree-shaken
+
+// app/page.tsx
+import { countries } from '@/data/countries';
+```
+
+**Anti-pattern**:
+```tsx
+// app/page.tsx
+const countries = [ // ❌ 200+ items inline in the page component
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  // ... 200 more entries
+];
+```
+
+### Missing React.memo on Context Consumers (Both Routers)
+
+**Detection**:
+```
+# Find components using useContext
+grep: "useContext" components/**/*.{tsx,jsx}
+# Check if those components are wrapped in React.memo
+grep: "React.memo|memo(" components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Expensive components (with heavy render logic or many children) that consume context via `useContext` without `React.memo` = LOW — they re-render on every context change even if the consumed value hasn't changed
+
+### Importing Entire Icon Libraries (Both Routers)
+
+**Detection**:
+```
+# Root imports from icon libraries
+grep: "from 'react-icons'$|from \"react-icons\"$|from '@fortawesome/fontawesome'|from 'lucide-react'$|import \* as.*Icons" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+# Correct subpath imports
+grep: "from 'react-icons/|from '@fortawesome/free-solid-svg-icons'|from 'lucide-react'" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Root-level icon library imports instead of subpath imports = MEDIUM — pulls the entire icon library into the bundle instead of just the icons used
+
+**Correct**:
+```tsx
+import { FaGithub } from 'react-icons/fa'; // ✅ Subpath import
+import { ArrowRight } from 'lucide-react'; // ✅ Named export (tree-shakeable)
+```
+
+**Anti-pattern**:
+```tsx
+import * as Icons from 'react-icons'; // ❌ Entire library
+import { icons } from 'lucide-react'; // ❌ All icons object
+```

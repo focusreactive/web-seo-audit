@@ -13,7 +13,7 @@ Use the Next.js patterns reference provided by the orchestrator in your agent pr
 
 You are responsible for the **Next.js Patterns** scoring category (18% weight in Next.js projects).
 
-**Boundary — Technical SEO & Performance**: General crawlability, meta tag presence, CWV patterns, and image optimization are owned by `web-seo-technical` and `web-seo-performance`. Focus exclusively on Next.js-specific patterns.
+**Boundary — Technical SEO & Performance**: General crawlability, meta tag presence, CWV patterns, and image optimization are owned by `web-seo-technical` and `web-seo-performance`. Focus exclusively on Next.js-specific patterns, including Next.js-specific performance antipatterns (excessive client boundaries, layout fetch caching, barrel files, dynamic import misuse, provider nesting, etc.).
 
 ## References
 
@@ -307,6 +307,135 @@ glob: next.config.{js,mjs,ts}
 - Inconsistent patterns across pages (some with metadata, some without)
 - `next.config.js` conflicting with App Router conventions
 - Missing error pages (`not-found.tsx` / `404.tsx`)
+
+### Step 6: Performance Antipatterns
+
+Use the Performance Antipatterns section from the `nextjs-patterns.md` reference for detailed detection rules and code examples.
+
+#### 6.1 Excessive `'use client'` Boundaries (App Router only)
+
+```
+# Count total components
+glob: app/**/*.{tsx,jsx}
+glob: components/**/*.{tsx,jsx}
+
+# Count Client Components
+grep: "'use client'" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Calculate `clientComponents / totalComponents`
+- \>60% = HIGH — most of the app loses Server Component benefits
+- 40-60% = MEDIUM — review whether some could be Server Components
+
+#### 6.2 Layout-Level Fetch Without Caching (App Router only)
+
+```
+grep: "fetch(" app/**/layout.{tsx,jsx,ts,js}
+```
+
+For each match, check for `next: { revalidate }` or `cache:` option.
+
+**Rules**:
+- `fetch()` in layouts without caching = HIGH — uncached fetches run on every navigation
+
+#### 6.3 Barrel File Re-exports (App Router only)
+
+```
+grep: "export \* from" **/index.{ts,tsx,js,jsx}
+```
+
+**Rules**:
+- `export * from` in index files imported by Server Components = MEDIUM — defeats tree-shaking
+
+#### 6.4 Client Component Wrapping Server Components (App Router only)
+
+```
+# Find Client Components that render {children}
+grep -l: "'use client'" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+# In those files, check for {children} with no interactivity
+```
+
+**Rules**:
+- `'use client'` wrapper rendering only `{children}` with no interactive logic = MEDIUM
+
+#### 6.5 Heavy Imports in `_app.tsx` (Pages Router only)
+
+```
+grep: "moment|import.*lodash[^/]|@mui/material|antd|@chakra-ui" pages/_app.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- Heavy libraries at top level of `_app` = HIGH — included in every page bundle
+
+#### 6.6 `getServerSideProps` Overuse (Pages Router only)
+
+```
+grep: "getServerSideProps" pages/**/*.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- `getServerSideProps` on pages with infrequently changing content = MEDIUM — use `getStaticProps` + `revalidate`
+
+#### 6.7 Excessive Dynamic Imports (Both routers)
+
+```
+grep: "dynamic\(|React\.lazy\(" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- \>10 `dynamic()` / `React.lazy()` calls project-wide = MEDIUM
+
+#### 6.8 Dynamic Imports for Above-the-Fold (Both routers)
+
+```
+grep: "dynamic\(.*Hero|dynamic\(.*Header|dynamic\(.*Nav|dynamic\(.*Banner" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Above-the-fold components (Hero, Header, Nav, Banner) loaded via `dynamic()` = HIGH — delays LCP
+
+#### 6.9 Too Many Nested Context Providers (Both routers)
+
+```
+# App Router
+grep: "Provider" app/layout.{tsx,jsx}
+
+# Pages Router
+grep: "Provider" pages/_app.{tsx,jsx,ts,js}
+```
+
+**Rules**:
+- \>5 providers = HIGH — cascading re-renders
+- 3-5 providers = MEDIUM — consider consolidating
+
+#### 6.10 Large Inline JSON in Pages (Both routers)
+
+```
+grep: "const .* = \[|const .* = \{" app/**/page.{tsx,jsx} pages/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Large data objects (>50 items or >50 lines) inlined in page components = MEDIUM — inflates JS bundle
+
+#### 6.11 Missing React.memo on Context Consumers (Both routers)
+
+```
+grep: "useContext" components/**/*.{tsx,jsx}
+grep: "React.memo|memo(" components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Expensive context-consuming components without `React.memo` = LOW
+
+#### 6.12 Importing Entire Icon Libraries (Both routers)
+
+```
+grep: "from 'react-icons'$|from '@fortawesome/fontawesome'|from 'lucide-react'$|import \* as.*Icons" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}
+```
+
+**Rules**:
+- Root-level icon library imports instead of subpath imports = MEDIUM
 
 ## Output Format
 

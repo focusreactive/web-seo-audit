@@ -105,7 +105,7 @@ Analyze performance and image optimization: LCP, INP, CLS patterns, bundle size,
 ### Template: nextjs
 
 ```
-Analyze Next.js patterns: metadata API, Server/Client Components, data fetching, generateStaticParams, next/image, next/link, next/font, next/script, route configuration, robots.ts, sitemap.ts, OG image generation, Streaming & Suspense. Router: {{nextjsRouter}}. Version: {{nextjsVersion}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Next.js patterns reference]: {{nextjsPatternsContent}}.
+Analyze Next.js patterns: metadata API, Server/Client Components, data fetching, generateStaticParams, next/image, next/link, next/font, next/script, route configuration, robots.ts, sitemap.ts, OG image generation, Streaming & Suspense, and performance antipatterns (excessive client boundaries, layout fetch caching, barrel files, dynamic import misuse, provider nesting, heavy _app imports, icon library imports, inline JSON, React.memo, getServerSideProps overuse). Router: {{nextjsRouter}}. Version: {{nextjsVersion}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Next.js patterns reference]: {{nextjsPatternsContent}}.
 ```
 
 ### Template: aeo

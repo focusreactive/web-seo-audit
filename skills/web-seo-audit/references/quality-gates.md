@@ -64,6 +64,11 @@ Each category starts at 100. Issues deduct points based on priority:
 - Hash-based SPA routing (`/#/`) — search engines may not crawl fragment URLs
 - Missing About page (no trust signal for E-E-A-T)
 - Missing author information on YMYL content pages
+- Excessive `'use client'` boundaries (>60% client components) — Next.js
+- Layout-level `fetch()` without caching in App Router — Next.js
+- Dynamic imports for above-the-fold components (Hero, Header, Nav) — Next.js
+- \>5 nested Context Providers in root layout / `_app` — Next.js
+- Heavy library imports in `_app.tsx` (moment, lodash, MUI, antd) — Next.js Pages Router
 
 **MEDIUM (-3 each, max 10)**
 - Title tag too long (> 60 chars) or too short (< 30 chars)
@@ -83,6 +88,14 @@ Each category starts at 100. Issues deduct points based on priority:
 - Missing Contact page or Privacy Policy
 - Missing author information on non-YMYL content pages
 - Excessively long URL paths (>100 characters)
+- Excessive `'use client'` boundaries (40-60% client components) — Next.js
+- Barrel file re-exports in index files imported by Server Components — Next.js
+- Client Component wrapping Server Components with only `{children}` — Next.js
+- \>10 dynamic imports project-wide — Next.js
+- 3-5 nested Context Providers in root layout / `_app` — Next.js
+- Large inline JSON data in page components — Next.js
+- Importing entire icon libraries instead of subpath imports — Next.js
+- `getServerSideProps` where `getStaticProps` + `revalidate` would suffice — Next.js Pages Router
 
 **LOW (-1 each, max 10)**
 - Trailing slashes inconsistency
@@ -91,6 +104,8 @@ Each category starts at 100. Issues deduct points based on priority:
 - Suboptimal image compression
 - Missing `rel="noopener"` on external links
 - Breadcrumb markup could be added
+- Missing `React.memo` on expensive context consumers — Next.js
+- Unnecessary dynamic imports for tiny components — Next.js
 
 ### AEO-Specific Deduction Examples
 
