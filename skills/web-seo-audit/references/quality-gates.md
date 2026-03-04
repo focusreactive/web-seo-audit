@@ -61,6 +61,9 @@ Each category starts at 100. Issues deduct points based on priority:
 - Redirect chains > 2 hops (A→B→C→D)
 - Route depth > 4 path segments from root
 - Zero server-rendered content on a page (client component wrapper only)
+- Hash-based SPA routing (`/#/`) — search engines may not crawl fragment URLs
+- Missing About page (no trust signal for E-E-A-T)
+- Missing author information on YMYL content pages
 
 **MEDIUM (-3 each, max 10)**
 - Title tag too long (> 60 chars) or too short (< 30 chars)
@@ -76,6 +79,10 @@ Each category starts at 100. Issues deduct points based on priority:
 - Redirect using 302 (temporary) when 301 (permanent) is appropriate
 - Route depth > 3 path segments from root
 - Minimal server-rendered content (all visible content loaded client-side)
+- Missing pagination markup (`rel="next/prev"`) on paginated content
+- Missing Contact page or Privacy Policy
+- Missing author information on non-YMYL content pages
+- Excessively long URL paths (>100 characters)
 
 **LOW (-1 each, max 10)**
 - Trailing slashes inconsistency

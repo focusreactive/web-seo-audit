@@ -89,6 +89,14 @@ Run these checks in order:
 - Check for uppercase, underscores, or special characters in route paths
 - Verify clean URL structure (no query params for content pages)
 - Check for trailing slash consistency
+- Check for hash-based routing patterns (`/#/`, `#/`) indicating SPA routing that search engines may not crawl (HIGH)
+- Check for excessively long route paths — count combined segment length per route, flag paths likely to exceed 100 characters (MEDIUM)
+
+**Pagination Markup**
+- `grep "rel=\"next\"|rel=\"prev\"|rel='next'|rel='prev'" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Identify paginated content patterns (e.g., `/blog/page/2`, `?page=`, dynamic route segments for pagination)
+- Flag paginated pages missing `rel="next"` / `rel="prev"` link tags (MEDIUM) — helps search engines understand page sequences
+- Check for `canonical` on paginated pages pointing to page 1 (valid but note in report)
 
 ### Step 3: Meta Tags Analysis
 
@@ -237,6 +245,32 @@ Detect pages that may have zero or minimal server-rendered content:
 - Check for `lang` attribute on `<html>`
 - Verify hreflang tags if multiple languages exist
 - Check Next.js i18n configuration
+
+### Step 12: E-E-A-T Signals (Code-Level)
+
+Check for Experience, Expertise, Authoritativeness, and Trustworthiness signals that search engines use for quality evaluation:
+
+**Author Information**
+- `grep "author|Author|byline|writer" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Check for author schema (`"@type": "Person"`, `author` property in Article/BlogPosting schema)
+- Check for visible author attribution patterns (byline components, author cards)
+- Flag content pages (blog, articles) with no author information (HIGH for YMYL topics, MEDIUM otherwise)
+
+**Trust Pages**
+- `glob: app/**/about/**/page.{tsx,jsx,ts,js}` or equivalent routes — check for About page existence
+- `glob: app/**/contact/**/page.{tsx,jsx,ts,js}` — check for Contact page existence
+- `glob: app/**/privacy*/**/page.{tsx,jsx,ts,js}` — check for Privacy Policy page
+- `glob: app/**/terms*/**/page.{tsx,jsx,ts,js}` — check for Terms of Service page
+- Flag missing About page (HIGH) — critical for E-E-A-T evaluation
+- Flag missing Contact page (MEDIUM) — supports trustworthiness
+- Flag missing Privacy Policy (MEDIUM) — expected on all commercial sites
+
+**Contact Information**
+- `grep "mailto:|tel:|phone|email|contact" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Check for structured contact info (email, phone number, address) in code
+- Check for Organization schema with `contactPoint` property
+
+**Boundary Note**: E-E-A-T structured data properties (`sameAs`, `about`, `reviewedBy`) are owned by `web-seo-aeo`. Only check for the presence of author attribution, trust pages, and contact information here.
 
 ## Output Format
 

@@ -52,6 +52,7 @@ These fixes have a clear solution but could affect behavior, layout, or involve 
 | Redirect chain consolidation (A→B→C to A→C) | Update redirect config to point directly to final destination | Could break intentional intermediate redirects | Edit |
 | Redirect loop fix | Remove or correct circular redirect entries | May require choosing which redirect to keep | Edit |
 | Wrong redirect status code (302→301) | Change `permanent: false` to `permanent: true` or 302 to 301 | Changes caching behavior, affects bookmarks | Edit |
+| Missing `rel="next/prev"` on paginated pages | Add pagination link tags to head | May not suit all pagination strategies | Edit |
 | Raw `<script>` → `next/script` | Replace `<script>` with `<Script>` component | Could affect script loading order | Edit |
 | Google Fonts `<link>` → `next/font` | Replace CDN link with `next/font/google` import | Changes font loading behavior | Edit |
 | Missing `priority` prop on hero images | Add `priority` to above-the-fold `<Image>` | Changes image loading priority | Edit |
@@ -74,6 +75,10 @@ These issues require human judgment and cannot be safely automated:
 | Multiple H1 elements on a page | Requires deciding which H1 to keep or how to restructure headings |
 | Route depth > 3-4 path segments | Requires URL restructuring and redirect planning — architectural decision |
 | Zero/minimal server-rendered content | Requires moving data fetching to server or adding static content — architectural decision |
+| Missing About page | Requires content, design, and routing decisions |
+| Missing Contact page or Privacy Policy | Requires content and legal review |
+| Missing author information on content pages | Requires deciding attribution model and author data source |
+| Hash-based SPA routing (`/#/`) | Requires migration to history-based routing — architectural decision |
 | Create dedicated author pages | Requires design, routing, and content decisions |
 | Add `generateStaticParams` to dynamic routes | Requires knowledge of all possible param values and data sources |
 | Implement proper code splitting | Requires understanding bundle composition and user flows |
