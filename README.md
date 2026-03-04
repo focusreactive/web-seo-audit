@@ -1,203 +1,329 @@
 # web-seo-audit
 
-**Scan your web project for SEO issues. Get a scored report. Fix and repeat.**
+**Your site's SEO breaks in code, not in production. Find it there.**
 
-A Claude Code plugin that performs code-level SEO analysis — no browser, no Lighthouse, no live URLs needed. It reads your source code, detects framework patterns, and produces a scored report across 6 categories with specific file locations and fixes.
+Most SEO tools audit a live URL after you've shipped. This plugin reads your source code *before* you deploy — catching missing meta tags, broken structured data, image issues, and AI search gaps while you're still in your editor.
+
+A Claude Code plugin. No browser, no Lighthouse, no dev server, no live URLs needed.
 
 ```
-SEO Health Score: 71/100 (C) — WARNING
+SEO Health Score: 88/100 (B+) — PASS
 
-| Category             | Score    | Status  | Issues           |
-|----------------------|----------|---------|------------------|
-| Technical SEO        | 77/100   | WARNING | 0C 1H 4M 3L     |
-| Performance          | 65/100   | WARNING | 1C 1H 3M 2L     |
-| Next.js Patterns     | 70/100   | WARNING | 1C 0H 5M 2L     |
-| Meta & Structured    | 84/100   | PASS    | 0C 2H 0M 0L     |
-| Image Optimization   | 62/100   | WARNING | 0C 2H 4M 1L     |
-| AI Search Readiness  | 55/100   | FAIL    | 1C 1H 3M 2L     |
+| Category             | Score    | Status  | Issues       |
+|----------------------|----------|---------|--------------|
+| Technical SEO        | 91/100   | PASS    | 0C 1H 0M 1L |
+| Performance          | 90/100   | PASS    | 0C 0H 3M 1L |
+| Next.js Patterns     | 96/100   | PASS    | 0C 0H 1M 1L |
+| Meta & Structured    | 85/100   | PASS    | 0C 1H 2M 1L |
+| Image Optimization   | 80/100   | PASS    | 0C 2H 1M 1L |
+| AI Search Readiness  | 77/100   | WARNING | 0C 1H 4M 3L |
 ```
 
-## What it does
+Every issue comes with a file path, an explanation of why it matters, and a code fix you can apply.
 
-1. **Detects your framework** — Next.js (App Router, Pages Router), React, Vue, Nuxt, Astro, and more
-2. **Spawns up to 4 specialized agents in parallel** — technical SEO, performance/CWV, AI search readiness, and framework-specific checks
-3. **Produces a scored report** — 0-100 health score per category, letter grade (A+ to F), PASS/WARNING/FAIL status, with every issue tied to a file path and a concrete fix
+## Why not Lighthouse?
 
-## Install
+Lighthouse audits a rendered page. This plugin audits your source code. Different inputs, different catches.
 
-### Plugin install (recommended)
+| | Lighthouse | web-seo-audit |
+|---|---|---|
+| **Input** | Live URL in a browser | Source code in your editor |
+| **When** | After deployment | Before deployment |
+| **Finds** | Runtime perf, paint metrics, basic SEO | Code patterns, framework misuse, missing files, structured data gaps |
+| **AI search** | No | Yes — llms.txt, AI crawler rules, entity data, content structure |
+| **Fix workflow** | Copy results, go find the code | Points to the exact file:line, offers auto-fix |
+| **Framework awareness** | No | Next.js metadata API, Server Components, `next/image`, route config |
+
+They're complementary. Lighthouse tells you what's slow. This tells you *why* it's slow and where to fix it.
+
+## Quick start
 
 ```bash
-# Add the marketplace
 /plugin marketplace add focusreactive/web-seo-audit
-
-# Install the plugin
 /plugin install web-seo-audit@focusreactive-seo-tools
 ```
 
-### One-liner
+Then open Claude Code in any web project:
+
+```
+/web-seo-audit
+```
+
+<details>
+<summary>Other install methods</summary>
+
+**One-liner**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/install.sh | bash
 ```
 
-### Manual
+**Manual**
 
 ```bash
 git clone https://github.com/focusreactive/web-seo-audit.git
 cd web-seo-audit && ./install.sh
 ```
 
-## Usage
+</details>
 
-Open Claude Code in any web project and run:
+## What you get
 
-| Command | What it does |
-|---------|-------------|
-| `/web-seo-audit` | Full audit — all 6 categories, scored report |
-| `/web-seo-audit fix` | Audit, auto-fix issues, re-audit — iterative cycle until target score |
-| `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80) |
-| `/web-seo-audit nextjs` | Next.js deep check — metadata API, Server Components, data fetching |
-| `/web-seo-audit cwv` | Core Web Vitals focus — LCP, INP, CLS risk analysis |
-| `/web-seo-audit meta` | Meta tags & structured data — title, OG, Twitter, JSON-LD |
-| `/web-seo-audit images` | Image optimization — format, sizing, lazy loading, alt text |
-| `/web-seo-audit aeo` | AI search readiness — llms.txt, AI crawlers, entity data, content structure |
-| `/web-seo-audit page <path>` | Single page analysis — inline check, no agents spawned |
-| `/web-seo-audit url <url>` | Live URL quick-check — surface-level scored report from rendered HTML |
+Every issue includes severity, file location, business impact, a concrete fix, and whether it can be auto-fixed:
 
-## What it checks
+```
+[HIGH] Meta & Structured Data: No JSON-LD structured data on homepage
 
-| Category | Checks | Agent |
-|----------|--------|-------|
-| **Technical SEO** | robots.txt, sitemap, canonical URLs, meta robots, URL structure, internal linking, security headers, mobile optimization, i18n | `web-seo-technical` |
-| **Performance** | LCP patterns, INP risk, CLS prevention, bundle size, font loading, third-party scripts, caching, compression | `web-seo-performance` |
-| **Next.js Patterns** | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | `web-seo-nextjs` |
-| **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types) | `web-seo-technical` |
-| **Image Optimization** | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop | `web-seo-performance` |
-| **AI Search Readiness** | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals | `web-seo-aeo` |
+  Location:    app/[lang]/page.tsx
+  Problem:     Homepage has no JSON-LD structured data. Missing Organization,
+               WebSite, and BreadcrumbList schemas. Search engines and AI
+               systems have no structured way to understand the business entity.
+  Impact:      No rich results in Google (sitelinks search box, logo, company
+               info). AI search engines can't extract entity data for answers.
+  Fixability:  auto-fix
+
+  Fix:
+  ┌─────────────────────────────────────────────────────────────
+  │ <script type="application/ld+json">
+  │ {
+  │   "@context": "https://schema.org",
+  │   "@type": "Organization",
+  │   "name": "Your Company",
+  │   "url": "https://example.com",
+  │   "logo": "https://example.com/logo.svg",
+  │   "sameAs": [
+  │     "https://www.linkedin.com/company/your-company",
+  │     "https://www.youtube.com/@your-company"
+  │   ]
+  │ }
+  │ </script>
+  └─────────────────────────────────────────────────────────────
+```
+
+```
+[HIGH] Image Optimization: 9+ images missing alt attributes
+
+  Location:    components/CaseStudyCard.tsx, components/Hero.tsx, +6 more
+  Problem:     Case study images, hero banner, and background images are all
+               missing alt attributes. Screen readers skip them. Search engines
+               can't index the visual content.
+  Impact:      Image search traffic lost. Accessibility failure (WCAG 1.1.1).
+               AI crawlers can't describe visual content.
+  Fixability:  confirm-fix
+
+  Fix:
+  ┌─────────────────────────────────────────────────────────────
+  │ // Before
+  │ <Image src={caseStudy.image} fill />
+  │
+  │ // After
+  │ <Image
+  │   src={caseStudy.image}
+  │   fill
+  │   alt="Smart parking management system in city center"
+  │ />
+  └─────────────────────────────────────────────────────────────
+```
+
+## AI search readiness
+
+This is the part no other tool covers.
+
+The `aeo` command checks how visible your site is to AI-powered search engines — ChatGPT, Perplexity, Claude, Gemini. These systems don't just crawl your pages; they need structured signals to extract, attribute, and cite your content.
+
+```
+/web-seo-audit aeo
+```
+
+```
+AI Search Readiness: 77/100 — WARNING
+Issues: 0C 1H 4M 3L
+
+[HIGH] No llms.txt file
+  Affects:   Training bots + Retrieval bots
+  Problem:   No llms.txt at /llms.txt. AI systems have no structured way
+             to discover site content, key pages, or documentation.
+  Fix:       Create public/llms.txt with site description and key pages.
+
+[MEDIUM] No explicit AI bot rules in robots.txt
+  Affects:   Both — training and retrieval bots
+  Problem:   robots.txt has only "User-agent: *". No explicit rules for
+             ChatGPT-User, PerplexityBot, ClaudeBot, or Applebot.
+  Fix:       Add explicit Allow rules for retrieval bots. Consider blocking
+             GPTBot (training) while allowing ChatGPT-User (retrieval).
+
+[MEDIUM] No <main> semantic element
+  Affects:   Retrieval bots — can't identify primary content area
+  Problem:   Page content wrapped in <div> without a <main> landmark.
+             AI crawlers use semantic landmarks to extract primary content.
+  Fix:       Wrap page content in <main> element in root layout.
+
+[MEDIUM] No entity-optimized structured data
+  Affects:   Both — AI can't verify entity identity
+  Problem:   No Organization schema with sameAs, @id, or mainEntityOfPage.
+             AI search engines can't confidently attribute content.
+  Fix:       Add Organization JSON-LD with sameAs links.
+
+[MEDIUM] No FAQ/HowTo schema on relevant content
+  Affects:   Retrieval bots — structured Q&A improves AI extraction
+  Fix:       Add FAQPage JSON-LD to pages with common questions.
+
+[LOW] No question-format headings
+  Problem:   Headings use statements ("Making cities more livable") instead
+             of questions ("How does smart parking reduce congestion?").
+             AI search matches user queries to headings.
+
+[LOW] Training bots not explicitly managed
+  Problem:   No Disallow rules for GPTBot, Google-Extended, CCBot.
+             Site content may be used for model training without opt-out.
+
+[LOW] No speakable markup
+  Problem:   No speakable structured data for text-to-speech or
+             voice assistant responses.
+```
+
+What it checks: llms.txt presence, AI crawler management (8 bots), entity-optimized structured data, semantic content structure, training vs. retrieval bot rules, speakable markup.
 
 ## Fix cycle
 
-The `fix` subcommand automates the audit-fix-verify loop:
+`/web-seo-audit fix` doesn't just report — it fixes. Audit, classify, fix, re-audit, repeat.
 
-1. **Audit** — Runs the full audit to identify all issues
-2. **Classify** — Buckets issues into auto-fix (safe mechanical changes), confirm-fix (ask first), and manual (report only)
-3. **Fix plan** — Shows what will be changed and estimated score improvement
-4. **Apply** — Auto-fixes are applied directly; confirm-fixes are shown for approval
-5. **Re-audit** — Runs the full audit again to verify fixes and catch regressions
-6. **Repeat** — Loops until the target score is met, max iterations (3) reached, or no progress is made
+```
+Fix Plan
 
-**Auto-fixable** examples: create `llms.txt`, add `alt`/`width`/`height` attributes, add JSON-LD, add `preconnect`, add AI bot rules to `robots.txt`, add `font-display: swap`, add metadata exports.
+| Type                       | Count | Estimated Impact |
+|----------------------------|-------|------------------|
+| Auto-fix (apply directly)  | 6     | ~14 points       |
+| Confirm-fix (ask first)    | 4     | ~8 points        |
+| Manual (report only)       | 2     | ~4 points        |
 
-**Confirm-fix** examples: replace `<img>` with `next/image`, remove unnecessary `'use client'`, add security headers, add `<Suspense>` boundaries.
+Current score: 88/100 → Estimated after fixes: ~96/100
+```
 
-**Manual** (reported but not attempted): convert SPA to SSR, restructure components, create author pages, add `generateStaticParams`.
+**Auto-fix** (applied directly): create `llms.txt`, add JSON-LD, add `preconnect`, add AI bot rules to `robots.txt`, add `<main>` landmark, add og:image dimensions.
 
-## Scored output
+**Confirm-fix** (shown for approval): add alt text to images, add width/height to images, route images through `next/image`, add `twitter:site`.
 
-Every audit produces a health score using a transparent methodology:
+**Manual** (reported only): restructure components, create author pages, add `generateStaticParams`.
 
-**Scoring**: Each category starts at 100. Issues deduct points: CRITICAL -15, HIGH -8, MEDIUM -3 (max 10), LOW -1 (max 10). Floor at 0.
+After fixes are applied, it re-audits and shows the delta:
 
-**Grades**: A+ (95-100), A (90-94), B+ (85-89), B (80-84), C+ (75-79), C (70-74), D+ (65-69), D (60-64), E (50-59), F (0-49)
+```
+Fix Cycle 1 Results
 
-**Status**: PASS (80+), WARNING (60-79), FAIL (0-59)
+| Category             | Before   | After    | Change |
+|----------------------|----------|----------|--------|
+| Technical SEO        | 91/100   | 100/100  | +9     |
+| Performance          | 90/100   | 96/100   | +6     |
+| Next.js Patterns     | 96/100   | 100/100  | +4     |
+| Meta & Structured    | 85/100   | 100/100  | +15    |
+| Image Optimization   | 80/100   | 96/100   | +16    |
+| AI Search Readiness  | 77/100   | 92/100   | +15    |
+| **Overall**          | **88/100** | **97/100** | **+9** |
 
-**Weights (Next.js)**: Technical SEO 22%, Performance 22%, Next.js Patterns 18%, Meta & Structured Data 18%, Image Optimization 10%, AI Search Readiness 10%
+Fixes applied: 10 | Failed: 0 | Skipped: 2
+```
 
-**Weights (other frameworks)**: Technical SEO 27%, Performance 27%, Meta & Structured Data 23%, Image Optimization 13%, AI Search Readiness 10%
+## Commands
 
-Every issue includes: priority level, file path with line number, problem description, impact explanation, and a concrete code fix.
+| Command                          | What it does                                                                |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `/web-seo-audit`                 | Full audit — all 6 categories, scored report                                |
+| `/web-seo-audit fix`             | Audit, auto-fix issues, re-audit — iterative cycle until target score       |
+| `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80)                            |
+| `/web-seo-audit nextjs`          | Next.js deep check — metadata API, Server Components, data fetching         |
+| `/web-seo-audit cwv`             | Core Web Vitals focus — LCP, INP, CLS risk analysis                         |
+| `/web-seo-audit meta`            | Meta tags & structured data — title, OG, Twitter, JSON-LD                   |
+| `/web-seo-audit images`          | Image optimization — format, sizing, lazy loading, alt text                 |
+| `/web-seo-audit aeo`             | AI search readiness — llms.txt, AI crawlers, entity data, content structure |
+| `/web-seo-audit page <path>`     | Single page analysis — inline check, no agents spawned                      |
+| `/web-seo-audit url <url>`       | Live URL quick-check — surface-level scored report from rendered HTML       |
 
-See [`examples/sample-output.md`](examples/sample-output.md) for a full example report.
+## What it checks
 
-## Architecture
+6 categories, 4 specialized agents running in parallel:
+
+| Category                   | Checks                                                                                                                                                                               | Agent                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| **Technical SEO**          | robots.txt, sitemap, canonical URLs, meta robots, URL structure, internal linking, security headers, mobile optimization, i18n                                                       | `web-seo-technical`   |
+| **Performance**            | LCP patterns, INP risk, CLS prevention, bundle size, font loading, third-party scripts, caching, compression                                                                         | `web-seo-performance` |
+| **Next.js Patterns**       | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | `web-seo-nextjs`      |
+| **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types)                                                                       | `web-seo-technical`   |
+| **Image Optimization**     | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop                                                                                     | `web-seo-performance` |
+| **AI Search Readiness**    | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals                                             | `web-seo-aeo`         |
+
+## Framework support
+
+| Framework                   | Support | Details                                                                   |
+| --------------------------- | ------- | ------------------------------------------------------------------------- |
+| **Next.js** (App Router)    | Full    | Dedicated agent, 12 check categories, metadata API, Server Components     |
+| **Next.js** (Pages Router)  | Full    | `getStaticProps`/`getServerSideProps`, `next/head`, `_document`, `_app`   |
+| **React**                   | Core    | Technical SEO + Performance + Meta + Images (no framework-specific agent) |
+| **Vue / Nuxt**              | Core    | Same core checks, framework-aware advice                                  |
+| **Astro / Gatsby / Svelte** | Core    | Same core checks, framework-aware advice                                  |
+| **Static HTML**             | Core    | All checks except framework-specific patterns                             |
+
+## Scoring
+
+Each category starts at 100. Issues deduct points: CRITICAL -15, HIGH -8, MEDIUM -3, LOW -1. Overall score is weighted by category.
+
+| Grade | Score | Status |
+|-------|-------|--------|
+| A+ | 95-100 | PASS |
+| A | 90-94 | PASS |
+| B+ | 85-89 | PASS |
+| B | 80-84 | PASS |
+| C+ | 75-79 | WARNING |
+| C | 70-74 | WARNING |
+| D | 60-69 | WARNING |
+| E | 50-59 | FAIL |
+| F | 0-49 | FAIL |
+
+See [`examples/sample-output.md`](examples/sample-output.md) for a full report.
+
+<details>
+<summary>Architecture</summary>
 
 ```
 /web-seo-audit
        │
        ▼
-┌─────────────────────────┐
+┌─────────────────────-────┐
 │  SKILL.md (orchestrator) │
 │  - Detects framework     │
 │  - Loads reference files │
 │  - Routes commands       │
 │  - Spawns agents         │
 │  - Compiles final report │
-└────────┬────────────────┘
+└────────┬─────────────-───┘
          │ spawns in parallel
          ├──────────────────────────────┬──────────────────────┐
          │                              │                      │
          ▼                              ▼                      ▼
-┌─────────────────┐  ┌──────────────────────┐  ┌─────────────────┐
-│ web-seo-technical│  │ web-seo-performance  │  │ web-seo-aeo     │
-│ - Crawlability   │  │ - LCP / INP / CLS    │  │ - llms.txt      │
-│ - Meta tags      │  │ - Bundle size        │  │ - AI crawlers   │
-│ - Structured data│  │ - Image optimization │  │ - Entity data   │
+┌───────────────-──┐  ┌──────────────────────┐  ┌──────────────-───┐
+│ web-seo-technical│  │ web-seo-performance  │  │ web-seo-aeo      │
+│ - Crawlability   │  │ - LCP / INP / CLS    │  │ - llms.txt       │
+│ - Meta tags      │  │ - Bundle size        │  │ - AI crawlers    │
+│ - Structured data│  │ - Image optimization │  │ - Entity data    │
 │ - Security       │  │ - Font loading       │  │ - Content struct │
 │ - Internal links │  │ - Third-party scripts│  │ - AI crawlability│
-└─────────────────┘  └──────────────────────┘  └─────────────────┘
+└────────────────-─┘  └──────────────────────┘  └───────────────-──┘
          │
          ▼ (Next.js projects only)
-┌─────────────────┐
+┌─────────────-────┐
 │ web-seo-nextjs   │
 │ - Metadata API   │
 │ - Server/Client  │
 │ - Data fetching  │
 │ - next/* APIs    │
 │ - Route config   │
-└─────────────────┘
-
-Reference files (loaded by orchestrator):
-  ├── quality-gates.md       — Scoring rules & weights
-  ├── cwv-thresholds.md      — Core Web Vitals reference
-  ├── nextjs-patterns.md     — Next.js detection rules
-  ├── schema-types.md        — JSON-LD validation (10 types)
-  ├── aeo-patterns.md        — AI search readiness patterns
-  └── fix-classification.md  — Fix cycle classification rules
+└────────────────-─┘
 ```
 
-## Framework support
+</details>
 
-| Framework | Support | Details |
-|-----------|---------|---------|
-| **Next.js** (App Router) | Full | Dedicated agent, 12 check categories, metadata API, Server Components |
-| **Next.js** (Pages Router) | Full | `getStaticProps`/`getServerSideProps`, `next/head`, `_document`, `_app` |
-| **React** | Core | Technical SEO + Performance + Meta + Images (no framework-specific agent) |
-| **Vue / Nuxt** | Core | Same core checks, framework-aware advice |
-| **Astro / Gatsby / Svelte** | Core | Same core checks, framework-aware advice |
-| **Static HTML** | Core | All checks except framework-specific patterns |
-
-## How it works
-
-This tool performs **static code analysis** — it reads your source files, configuration, and dependencies to identify SEO issues. It does not:
-
-- Run a browser or headless Chrome
-- Fetch live URLs (except the optional `url` command)
-- Require a running dev server
-- Need network access to your site
-
-This means it catches issues **before deployment** — in your IDE, during code review, or in CI.
-
-## Uninstall
-
-### Plugin uninstall
-
-```
-/plugin uninstall web-seo-audit@focusreactive-seo-tools
-```
-
-### Manual uninstall
-
-```bash
-# From clone
-./uninstall.sh
-
-# Or one-liner
-curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/uninstall.sh | bash
-```
-
-## Project structure
+<details>
+<summary>Project structure</summary>
 
 ```
 web-seo-audit/
@@ -226,6 +352,25 @@ web-seo-audit/
 ├── LICENSE                      # MIT
 └── README.md
 ```
+
+</details>
+
+## Uninstall
+
+```
+/plugin uninstall web-seo-audit@focusreactive-seo-tools
+```
+
+<details>
+<summary>Manual uninstall</summary>
+
+```bash
+./uninstall.sh
+# or
+curl -fsSL https://raw.githubusercontent.com/focusreactive/web-seo-audit/main/uninstall.sh | bash
+```
+
+</details>
 
 ## License
 
