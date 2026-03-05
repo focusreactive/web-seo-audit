@@ -144,6 +144,7 @@ grep: "web-vitals|@next/bundle-analyzer|lighthouse|crux-api" package.json
   `grep "dynamic\(|lazy\(|import\(" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 - For Next.js: verify `next/dynamic` is used for heavy client-side components
 - Flag pages that import heavy libraries at the top level
+- **Cross-check**: Do NOT recommend `dynamic()` or lazy loading for above-the-fold components (Hero, Header, Nav, Banner, Masthead, TopBar). Dynamically importing above-fold components delays LCP and is itself a HIGH antipattern. If a heavy library is pulled in via a statically imported above-fold component, the fix is to optimize the component or lazy-load the library internally — not to dynamically import the component itself.
 
 **Bundle Analyzer**
 - Check if `@next/bundle-analyzer` is configured

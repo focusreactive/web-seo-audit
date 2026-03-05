@@ -161,6 +161,14 @@ Each category starts at 100. Issues deduct points based on priority:
 
 ## Priority Classification Rules
 
+### Severity Validation (apply before assigning any priority)
+
+Before classifying an issue as CRITICAL or HIGH, answer these three questions. If any answer is "no", downgrade the severity.
+
+1. **Is the problem actually present?** Check whether the concern is already handled through an alternative mechanism (e.g., hreflang in `<head>` instead of sitemap, SSR via a different pattern, meta tags via a plugin). A missing implementation in one place is not a problem if it is correctly implemented elsewhere.
+2. **Is the impact real at this severity level?** CRITICAL means indexing is blocked or CWV fails "poor." HIGH means rankings are directly harmed. Can you point to the specific mechanism that causes this level of impact? If you are estimating or guessing, downgrade to MEDIUM.
+3. **Does the fix make things better, not worse?** Verify the recommended fix does not contradict another best practice or introduce a new issue. If it does, either find a correct fix or do not report the finding.
+
 ### Classify as CRITICAL when:
 - The issue prevents search engines from crawling or indexing content
 - The issue causes Core Web Vitals to fail "poor" thresholds
@@ -185,6 +193,33 @@ Each category starts at 100. Issues deduct points based on priority:
 - The fix provides marginal improvement
 - The issue only affects edge cases
 - Industry standards are evolving on the topic
+
+### Impact Description Rules
+- **Never cite specific timing values** (e.g., "adds 300ms", "delays TTI by 600ms") from code analysis alone. Code-level analysis cannot determine actual load times — those depend on network, device, server, and CDN conditions.
+- Use **risk language** instead: "increases LCP risk", "may delay interactivity", "adds to critical bundle size".
+- Specific timing numbers are only permitted when derived from **field data** (CrUX) or **lab data** (Lighthouse/PSI).
+- Do not invent bundle size numbers (e.g., "~50kB gzipped") unless verified from published package metadata.
+
+### Cross-Check Rules
+- **Before recommending `dynamic()` or lazy loading** for a component, verify it is NOT an above-the-fold component (Hero, Header, Nav, Banner, Masthead, TopBar). Above-fold components must be statically imported — dynamically importing them delays LCP and is itself a HIGH-priority antipattern.
+- **Before recommending removing a static import**, check whether the component renders above-the-fold content. If it does, the static import is correct regardless of the library's bundle size.
+- When a finding's recommended fix would trigger a separate known antipattern, **do not report the finding**. Resolve the contradiction first.
+
+### Signal Relevance Rules
+Every sub-point within an issue MUST have a **direct, proven causal relationship** to the metric or category it is reported under. Do not pad findings with loosely related observations.
+
+**Before including a sub-point, verify**:
+1. **Causal link exists** — The pattern directly causes the stated metric impact through a known, documented mechanism (e.g., missing `width`/`height` → browser cannot reserve space → layout shift → CLS).
+2. **Not just correlated** — "This is an image best practice" is not sufficient reason to list it under CLS. It must actually cause layout shifts.
+3. **Not a different category** — If a pattern affects performance but not CLS, report it under Performance, not CLS. If it affects UX but not SEO, do not report it as an SEO issue.
+
+**Common false associations to avoid**:
+- `placeholder="blur"` does NOT prevent CLS — it is a loading UX enhancement, not a layout stability mechanism. Only `width`/`height`, `fill` with sized container, or CSS `aspect-ratio` prevent CLS.
+- `alt` attributes do NOT affect performance — they affect accessibility and image SEO.
+- `loading="lazy"` on below-fold images does NOT affect LCP — LCP measures the largest above-fold element.
+- Font `preload` does NOT affect CLS unless the font causes a visible size change on swap.
+
+**If in doubt, leave it out.** A clean finding with one accurate sub-point is better than a noisy finding with three where one is wrong.
 
 ## Issue Output Format
 

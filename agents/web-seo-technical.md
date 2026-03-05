@@ -246,6 +246,10 @@ Detect pages that may have zero or minimal server-rendered content:
 - Verify hreflang tags if multiple languages exist
 - Check Next.js i18n configuration
 
+**Hreflang cross-check** — hreflang annotations can be delivered via three equivalent mechanisms: `<link rel="alternate" hreflang="...">` in `<head>`, `metadata.alternates` in the metadata API, or `<xhtml:link>` in the sitemap. Google accepts any of these sources.
+- Before flagging missing or stubbed sitemap hreflang, check whether hreflang is already provided in page `<head>` tags or metadata exports. If it is, the sitemap hreflang is **redundant** — classify as LOW (best practice to have both) not HIGH.
+- Only flag missing hreflang as HIGH when **no hreflang exists in any source** (head, metadata, or sitemap) for a multi-language site.
+
 ### Step 12: E-E-A-T Signals (Code-Level)
 
 Check for Experience, Expertise, Authoritativeness, and Trustworthiness signals that search engines use for quality evaluation:
