@@ -1,7 +1,7 @@
 ---
 name: web-seo-audit
 description: Analyze web projects for technical SEO, performance, and AI search readiness. Runs code-level analysis for crawlability, Core Web Vitals, meta tags, structured data, image optimization, AI search readiness (AEO), and framework-specific patterns. Supports Next.js (App Router & Pages Router) with specialized checks.
-argument-hint: "[audit|fix [--target <score>]|page <path>|nextjs|cwv|meta|images|aeo|perf] [<url>]"
+argument-hint: "[audit|fix [--target N] [--dry-run] [--category X] [--severity X]|diff [<base>]|page <path>|nextjs|cwv|meta|images|aeo|perf] [<url>]"
 ---
 
 # Tech SEO & Performance Analyzer
@@ -11,6 +11,28 @@ You are a Technical SEO Lead orchestrating a comprehensive audit of a web projec
 ## Framework Detection Protocol
 
 Before running any analysis, detect the project framework, version, and structure. This determines which checks to run — agents only receive checks relevant to the detected framework and version.
+
+### Step 0: Detect Monorepo
+
+Before framework detection, check if this is a monorepo:
+
+```
+glob: pnpm-workspace.yaml
+glob: lerna.json
+grep: "workspaces" package.json
+glob: nx.json
+glob: turbo.json
+```
+
+If a monorepo is detected:
+1. List all workspace packages: `glob: packages/*/package.json` and `glob: apps/*/package.json`
+2. For each package, check if it has a web framework dependency (next, nuxt, gatsby, astro, etc.)
+3. If multiple web packages exist, ask the user: "Multiple web apps detected: {list}. Which one should I audit?" using AskUserQuestion
+4. If only one web package exists, use it automatically
+5. Set `sourceRoot` to the selected package's path (e.g., `apps/web/`)
+6. Read the selected package's `package.json` for framework detection (not the root `package.json`)
+
+If not a monorepo, proceed with the root `package.json`.
 
 ### Step 1: Detect Framework
 
@@ -27,16 +49,24 @@ grep: "\"astro\":" package.json
 grep: "\"svelte\":" package.json
 grep: "\"@angular/core\":" package.json
 grep: "\"@11ty/eleventy\":" package.json
+grep: "\"@remix-run/react\":" package.json
+grep: "\"@sveltejs/kit\":" package.json
+grep: "\"@builder.io/qwik\":" package.json
 ```
 
 **Framework priority resolution** (when multiple detected, use this order):
 1. `next` — if `"next":` found in dependencies
 2. `nuxt` — if `"nuxt":` found
-3. `gatsby` — if `"gatsby":` found
-4. `astro` — if `"astro":` found
-5. `eleventy` — if `"@11ty/eleventy":` found in dependencies or devDependencies
-6. `vue` / `svelte` / `angular` / `react` — generic SPA checks
-7. `other` — no framework dependencies found, treat as static HTML
+3. `remix` — if `"@remix-run/react":` found (SSR meta-framework with `meta()` export, `loader` functions)
+4. `gatsby` — if `"gatsby":` found
+5. `astro` — if `"astro":` found
+6. `sveltekit` — if `"@sveltejs/kit":` found (SSR meta-framework with `+page.server.ts`, `<svelte:head>`)
+7. `qwik` — if `"@builder.io/qwik":` found (resumable framework with `routeLoader$`)
+8. `eleventy` — if `"@11ty/eleventy":` found in dependencies or devDependencies
+9. `vue` / `svelte` / `angular` / `react` — generic SPA checks
+10. `other` — no framework dependencies found, treat as static HTML
+
+> Note: Remix, SvelteKit, and Qwik are detected as SSR meta-frameworks to avoid false "No SSR/SSG" CRITICAL findings. They currently use universal checks only (no dedicated framework agent). Dedicated agent support may be added in the future.
 
 ### Step 2: Detect Version
 
@@ -53,6 +83,13 @@ grep: "\"@11ty/eleventy\": \"" package.json → e.g., "3.0.0"
 # Parse major.minor from version string (strip ^, ~, >= prefixes)
 # Examples: "^14.2.3" → 14.2, "~3.8.0" → 3.8, ">=5.0.0" → 5.0
 ```
+
+**Version parsing edge cases**:
+- `"canary"`, `"latest"`, `"rc"`, `"beta"`, `"alpha"` tags → treat as latest stable version for that framework
+- Pre-release versions (e.g., `15.0.0-rc.1`) → use the major.minor (15.0)
+- `"workspace:*"` or `"workspace:^X"` (monorepo protocol) → check `node_modules/{framework}/package.json` for the actual installed version
+- `"*"` or empty string → unknown version; run universal checks only, note "version could not be determined" in report
+- If version cannot be determined after all attempts → note in report header, proceed with universal checks only
 
 ### Step 3: Detect Template Engine (Eleventy only)
 
@@ -107,6 +144,158 @@ After detection, consult `references/framework-checks.md` to build the check lis
 
 This ensures agents never run irrelevant checks (e.g., no `next/image` checks for Vue projects, no App Router checks for Next.js 12 projects).
 
+**Performance/Framework check deduplication**: When a framework agent IS spawned, remove framework-specific performance checks from `{{performanceChecks}}` to prevent the performance agent from duplicating the framework agent's work. The framework agent owns all framework-specific antipattern checks. The performance agent should only run universal performance checks in this case. When no framework agent is spawned, the performance agent runs both universal and framework-specific checks.
+
+## Custom Configuration (.seo-audit-config.yaml)
+
+Projects can customize audit behavior by placing a `.seo-audit-config.yaml` file at the project root.
+
+### Step 0.25: Load Custom Config
+
+Before ignore rules and framework detection:
+
+```
+glob: .seo-audit-config.yaml
+glob: .seo-audit-config.yml
+```
+
+If found, parse and apply overrides. Pass relevant overrides as `{{checkOverrides}}` to agent prompts.
+
+### Config Format
+
+```yaml
+# Override severity for specific checks
+severity:
+  missing-llms-txt: LOW          # Downgrade llms.txt from MEDIUM to LOW
+  raw-img: CRITICAL              # Upgrade raw <img> to CRITICAL for this project
+
+# Disable specific checks entirely
+disable:
+  - missing-csp                  # We handle CSP at CDN level
+  - training-bots                # We don't care about training bot management
+
+# Custom score weights (override defaults)
+weights:
+  technical-seo: 30
+  performance: 25
+  meta-structured-data: 20
+  image-optimization: 10
+  ai-search-readiness: 15
+  # framework-patterns weight is auto-calculated from remainder
+
+# Target pages for focused analysis
+focus-pages:
+  - app/page.tsx                 # Homepage
+  - app/products/[slug]/page.tsx # Product pages
+  # When set, agents prioritize these pages and report issues on them first
+```
+
+### Validation Rules
+
+- Severity overrides must use valid severity values (CRITICAL/HIGH/MEDIUM/LOW)
+- Disabled checks must match known check names (warn if unrecognized)
+- Weight values must sum to 100 (or be auto-normalized)
+- Invalid config entries are ignored with a warning in the report header
+
+### Agent Behavior
+
+When agents receive `{{checkOverrides}}`:
+- Apply severity overrides after detection but before reporting
+- Skip disabled checks entirely
+- Focus-pages: analyze these first and ensure full coverage, then proceed with remaining pages
+
+## Issue Suppression (.seo-audit-ignore)
+
+Projects can suppress known issues by placing a `.seo-audit-ignore` file at the project root. This prevents known, accepted issues from cluttering repeated audit runs.
+
+### Step 0.5: Load Ignore Rules
+
+After monorepo detection but before framework detection:
+
+```
+glob: .seo-audit-ignore
+```
+
+If found, read the file and parse ignore rules. Pass as `{{ignoreRules}}` to all agent prompts.
+
+### Ignore File Format
+
+Each line is a rule. Blank lines and `#` comments are ignored.
+
+```
+# Suppress specific issue by ID
+missing-sitemap:site-wide
+raw-img:components/TeamSection.tsx:14
+
+# Suppress all issues for a check name (any location)
+missing-lang:*
+
+# Suppress all issues in a file
+*:components/LegacyWidget.tsx:*
+
+# Suppress by category
+category:AI Search Readiness
+```
+
+### Rule Matching
+
+1. **Exact ID match**: `{check-name}:{location}` — suppresses that specific issue
+2. **Check-name wildcard**: `{check-name}:*` — suppresses all instances of that check
+3. **File wildcard**: `*:{file-path}:*` — suppresses all issues in that file
+4. **Category suppression**: `category:{name}` — suppresses all issues in that category (still runs checks but marks all as suppressed)
+
+### Agent Behavior
+
+When agents receive `{{ignoreRules}}`:
+- Still detect and report all issues normally
+- Mark suppressed issues with `"suppressed": true` in the JSON output
+- In markdown output, append `(suppressed)` to the issue title
+
+### Orchestrator Behavior
+
+- Suppressed issues do NOT count toward score deductions
+- Show suppressed issues in a separate collapsed section at the end of the report
+- Show count: "N issues suppressed by .seo-audit-ignore"
+- If all issues in a category are suppressed, the category scores 100/100
+
+## File Exclusion Patterns
+
+All agents MUST exclude these paths from grep/glob searches to avoid false positives from test files, build artifacts, and example code:
+
+```
+# Test files
+**/*.test.{ts,tsx,js,jsx}
+**/*.spec.{ts,tsx,js,jsx}
+**/__tests__/**
+**/__mocks__/**
+
+# Storybook
+**/*.stories.{ts,tsx,js,jsx}
+**/.storybook/**
+
+# Build artifacts and dependencies
+**/node_modules/**
+**/dist/**
+**/build/**
+**/.next/**
+**/.nuxt/**
+**/.astro/**
+**/_site/**
+
+# Test infrastructure
+**/fixtures/**
+**/examples/**
+**/e2e/**
+**/cypress/**
+**/playwright/**
+
+# Generated files
+**/*.d.ts
+**/coverage/**
+```
+
+Include this exclusion list in every agent prompt. Agents must apply these exclusions to all grep and glob operations.
+
 ## Source Root Detection
 
 After framework detection, determine the source root prefix so agents use correct file paths:
@@ -150,7 +339,8 @@ Analyze technical SEO and meta/structured data. Framework: {{framework}} {{frame
 Run ONLY these checks (filtered for this framework and version):
 {{technicalChecks}}
 
-[Quality-gates]: {{qualityGatesSummary}}. [Schema-types reference]: {{schemaTypesContent}}.
+[File exclusions]: {{fileExclusions}}
+[Quality-gates]: {{qualityGatesSummary}}. [Schema-types reference]: {{schemaTypesContent}}. [Output schema]: {{outputSchemaContent}}.
 ```
 
 ### Template: performance
@@ -161,7 +351,8 @@ Analyze performance and image optimization. Framework: {{framework}} {{framework
 Run ONLY these checks (filtered for this framework and version):
 {{performanceChecks}}
 
-[Quality-gates]: {{qualityGatesSummary}}. [CWV reference]: {{cwvContent}}.
+[File exclusions]: {{fileExclusions}}
+[Quality-gates]: {{qualityGatesSummary}}. [CWV reference]: {{cwvContent}}. [Output schema]: {{outputSchemaContent}}.
 ```
 
 ### Template: framework
@@ -174,7 +365,8 @@ Analyze {{framework}}-specific patterns. Version: {{frameworkVersion}}. Router: 
 Run ONLY these checks (filtered for version {{frameworkVersion}}):
 {{frameworkChecks}}
 
-[Quality-gates]: {{qualityGatesSummary}}. [Framework patterns reference]: {{frameworkPatternsContent}}.
+[File exclusions]: {{fileExclusions}}
+[Quality-gates]: {{qualityGatesSummary}}. [Framework patterns reference]: {{frameworkPatternsContent}}. [Output schema]: {{outputSchemaContent}}.
 ```
 
 **Framework patterns reference** is loaded based on detected framework:
@@ -183,7 +375,7 @@ Run ONLY these checks (filtered for version {{frameworkVersion}}):
 - Gatsby → (future: `references/gatsby-patterns.md`)
 - Astro → (future: `references/astro-patterns.md`)
 
-If no dedicated patterns reference exists for the framework, include the relevant checks from `references/framework-checks.md` inline in the prompt.
+If no dedicated patterns reference exists for the framework (currently only Next.js has `nextjs-patterns.md`), include the framework's check table from `references/framework-checks.md` directly in the agent prompt, along with this instruction: "Use the check descriptions in the table as your detection rules. For each check, apply the standard Verification Protocol (read file context, trace imports, check for alternative implementations). Report findings with the same format and rigor as if a full patterns reference were available."
 
 ### Template: aeo
 
@@ -196,7 +388,8 @@ Run ONLY these checks (all AEO checks are universal, but use framework-specific 
 Framework-specific file paths for detection:
 {{aeoFilePaths}}
 
-[Quality-gates]: {{qualityGatesSummary}}. [AEO patterns reference]: {{aeoContent}}.
+[File exclusions]: {{fileExclusions}}
+[Quality-gates]: {{qualityGatesSummary}}. [AEO patterns reference]: {{aeoContent}}. [Output schema]: {{outputSchemaContent}}.
 ```
 
 ### Template: fix
@@ -204,6 +397,11 @@ Framework-specific file paths for detection:
 ```
 Run iterative fix cycle: audit the project, classify issues by fixability, apply safe fixes, re-audit, repeat until target score ({{targetScore}}) or max iterations ({{maxIterations}}). Framework: {{framework}} {{frameworkVersion}}. Router: {{router}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Fix-classification reference]: {{fixClassificationContent}}.
 ```
+
+### Structured Data Coordination
+
+When building the technical agent prompt, include this directive:
+"For structured data, report ONLY: missing @context, missing required properties per schema-types.md, relative URLs, invalid dates, invalid JSON, duplicate schemas, schema on wrong page type. Do NOT report on: sameAs, about, dateModified freshness, mainEntityOfPage, speakable, reviewedBy, @id consistency, FAQPage/HowTo presence — these are scored by web-seo-aeo. If you encounter these during your analysis, you may note them as '(AEO opportunity — scored under AI Search Readiness)' but do not assign a severity or deduction."
 
 ### Variable Reference
 
@@ -218,12 +416,14 @@ Run iterative fix cycle: audit the project, classify issues by fixability, apply
 | `{{frameworkChecks}}` | `references/framework-checks.md` | Deep framework-specific checks, filtered by version and router |
 | `{{aeoChecks}}` | `references/framework-checks.md` | Universal AEO checks (all apply regardless of framework) |
 | `{{aeoFilePaths}}` | `references/framework-checks.md` | Framework-specific file paths for AEO detection patterns |
+| `{{fileExclusions}}` | File Exclusion Patterns section | Standard exclusion paths for test, build, and example files |
 | `{{qualityGatesSummary}}` | `references/quality-gates.md` | Summary of scoring rules (deduction values, caps, output format) |
 | `{{schemaTypesContent}}` | `references/schema-types.md` | Full content of schema-types reference |
 | `{{cwvContent}}` | `references/cwv-thresholds.md` | Full content of CWV thresholds reference |
 | `{{frameworkPatternsContent}}` | Framework-specific reference file | Next.js → `nextjs-patterns.md`, etc. Loaded only for frameworks with dedicated reference files |
 | `{{aeoContent}}` | `references/aeo-patterns.md` | Full content of AEO patterns reference |
 | `{{fixClassificationContent}}` | `references/fix-classification.md` | Full content of fix classification reference |
+| `{{outputSchemaContent}}` | `references/output-schema.md` | Agent output JSON schema — agents must include `agent-output` JSON block |
 | `{{targetScore}}` | User argument or default | Target score for fix cycle (default: 80) |
 | `{{maxIterations}}` | Default | Maximum fix-audit iterations (default: 3) |
 
@@ -285,6 +485,18 @@ When both code-level and live data are available, classify each finding:
 | **Hidden** | Live data shows a problem but no code pattern found | Likely infrastructure, CDN, or third-party — investigate beyond code |
 | **Latent risk** | Code pattern flagged as risky but live data is healthy | Fix proactively — prevents future regression |
 
+#### Correlation Confidence Refinement
+
+When a code risk is flagged but field data shows FAST/Good, apply nuance based on the code-level severity:
+
+| Code Risk Level | Field Rating | Correlation | Action |
+|----------------|-------------|-------------|--------|
+| HIGH or CRITICAL | FAST | Latent Risk | Keep at original severity — the code issue is real and could regress |
+| MEDIUM | FAST | Latent Risk (low priority) | Downgrade to LOW — the code concern may be theoretical |
+| LOW | FAST | (omit) | Do not include in correlation table — too speculative |
+| Any | AVERAGE | Confirmed (moderate) | Keep severity, note field data supports the finding |
+| Any | SLOW | Confirmed (severe) | Keep or escalate severity — real users are impacted |
+
 ## Command Routing
 
 Parse the argument to determine which subcommand to run. If no argument is provided, default to `audit`.
@@ -307,6 +519,7 @@ Runs a comprehensive audit across all categories. This is the default command. W
    - Read `references/cwv-thresholds.md` for CWV reference
    - Read `references/schema-types.md` for structured data reference
    - Read `references/aeo-patterns.md` for AI search readiness reference
+   - Read `references/output-schema.md` for agent output JSON contract
    - If framework has a dedicated patterns reference (e.g., Next.js → `references/nextjs-patterns.md`): read it
 5. Spawn agents **in parallel** using the Agent tool. Build each agent's prompt from its Prompt Template (see Prompt Templates above), filling in all `{{variable}}` placeholders with detected values, filtered check lists, and loaded reference content.
 
@@ -338,19 +551,27 @@ Runs a comprehensive audit across all categories. This is the default command. W
    - Correlation summary: confirmed issues, hidden issues, latent risks
 9. Compile the unified report (see Report Format below)
 
-### `fix [--target <score>]` — Iterative Fix Cycle
+### `fix [--target <score>] [--dry-run] [--category <name>] [--severity <level>]` — Iterative Fix Cycle
 
 Runs the full audit, then automatically applies safe fixes and re-audits until the target score is reached or no more progress can be made. Default target score is 80 (PASS threshold). Example: `/web-seo-audit fix --target 90`.
 
+**Flags**:
+- `--target <score>` — Target score (default: 80, range: 1-100)
+- `--dry-run` — Show what would be fixed without applying changes. Presents the fix plan and stops.
+- `--category <name>` — Only fix issues in the specified category (e.g., `--category "Image Optimization"`)
+- `--severity <level>` — Only fix issues at or above this severity (e.g., `--severity HIGH` fixes CRITICAL + HIGH only)
+
 **Steps**:
 
-1. **Parse arguments** — Extract target score from `--target <score>` (default: 80, range: 1-100). Set `maxIterations = 3`.
+1. **Parse arguments** — Extract target score from `--target <score>` (default: 80, range: 1-100). Set `maxIterations = 3`. Parse `--dry-run`, `--category`, and `--severity` flags.
 
 2. **Initial Audit** — Run the full `audit` flow (steps 1-8 above). Record the initial overall score and per-category scores. If the score already >= target, report "Score {score}/100 already meets target {target}. No fixes needed." and stop.
 
 3. **Load Fix Classification** — Read `references/fix-classification.md` for the classification matrix and application rules.
 
 4. **Classify Issues** — For each issue from the audit:
+   - If `--category` flag provided: skip issues not in that category
+   - If `--severity` flag provided: skip issues below the specified severity (severity order: CRITICAL > HIGH > MEDIUM > LOW)
    - Use the **Fixability** field from the agent output (auto-fix / confirm-fix / manual)
    - Cross-reference against the fix-classification matrix to validate the classification
    - Bucket issues into three lists: `autoFixes`, `confirmFixes`, `manualIssues`
@@ -371,6 +592,8 @@ Runs the full audit, then automatically applies safe fixes and re-audits until t
    ```
 
    If there are no auto-fix or confirm-fix issues, report "No auto-fixable issues found. Remaining {n} issues require manual intervention:" followed by the manual issues list, then stop.
+
+   If `--dry-run` flag is set: present the fix plan and stop. Do not apply any changes.
 
 6. **Apply Fixes** — Process fixable issues (CRITICAL → HIGH → MEDIUM → LOW):
 
@@ -444,23 +667,64 @@ Runs the full audit, then automatically applies safe fixes and re-audits until t
     {List all manual issues with priority, location, and description}
     ```
 
-### `page <path>` — Single Page Analysis
+### `diff [<base>]` — Incremental Analysis
 
-Analyze a specific page/route file for SEO issues.
+Analyze only files changed since a git reference point. Useful for PR reviews and pre-commit checks.
 
 **Steps**:
-1. Run framework detection
-2. Read the specified file and its imports/dependencies
-3. Check the file for:
-   - Meta tags / metadata exports
-   - Structured data
-   - Image optimization
-   - Performance patterns (client-side fetching, render-blocking)
+
+1. **Parse base reference** — Default: `main`. Accept branch name, tag, or commit SHA.
+2. **Get changed files**:
+   ```bash
+   git diff --name-only {base}...HEAD -- '*.tsx' '*.jsx' '*.ts' '*.js' '*.html' '*.njk' '*.liquid' '*.md'
+   ```
+   Also check for new/modified config files:
+   ```bash
+   git diff --name-only {base}...HEAD -- 'robots.txt' 'sitemap*' 'llms.txt' 'next.config*' 'nuxt.config*'
+   ```
+3. **If no changed files**: Report "No SEO-relevant files changed since {base}." and stop.
+4. **Run framework detection** (same as full audit).
+5. **For each changed file**: Run inline single-page analysis (same as `page` command) but batched.
+6. **For changed config files**: Run relevant checks (robots.txt → technical, next.config → framework).
+7. **Present results** as a compact diff-focused report:
+   ```
+   ## SEO Diff Report: {base}...HEAD
+
+   **Files analyzed**: {n} changed files
+
+   | File | New Issues | Resolved | Net |
+   |------|-----------|----------|-----|
+   | {path} | {n} | {n} | {+/-} |
+   ```
+   List all new issues with full format. If a previous `.seo-audit-history.json` exists, compare to identify resolved issues.
+
+### `page <path>` — Single Page Analysis
+
+Deep analysis of a specific page/route file for SEO issues. More thorough than a full audit for this one page because it traces the full component tree.
+
+**Steps**:
+1. Run framework detection and source root detection
+2. Load references: `quality-gates.md`, `schema-types.md`, `cwv-thresholds.md`, `aeo-patterns.md`
+   - If framework has dedicated patterns reference: load it too
+3. **Read the specified file** in full
+4. **Trace imports** — For every import in the file:
+   - Read the imported component/module
+   - Check if it provides SEO-relevant functionality (metadata, structured data, images, analytics scripts)
+   - Follow up to 3 levels deep (page → component → utility)
+5. **Check layout inheritance** (framework-specific):
+   - Next.js App Router: read parent `layout.tsx` files up to root for metadata merging
+   - Next.js Pages Router: check `_app.tsx` and `_document.tsx`
+   - Nuxt: check `app.vue` and `layouts/default.vue`
+6. Check the file and its dependency tree for:
+   - Meta tags / metadata exports (including inherited from layouts)
+   - Structured data (in page or injected via components)
+   - Image optimization (all `<img>` and framework image components)
+   - Performance patterns (client-side fetching, render-blocking, heavy imports)
    - Accessibility basics (headings, alt text, semantic HTML)
    - AI search readiness (semantic landmarks, question headings, entity structured data properties, FAQPage/HowTo schemas)
-   - If Next.js: framework-specific patterns for that page
-4. Report issues found in that page only
-5. Provide a mini-score for the page
+   - If framework: framework-specific patterns for that page
+7. Report issues found in the page and its component tree
+8. Provide a mini-score for the page (same deduction rules, but only for this page's issues)
 
 Do NOT spawn agents for single page analysis — do this inline.
 
@@ -721,6 +985,17 @@ Run code-level analysis AND fetch live performance data, then correlate the find
 
 After collecting results from all agents, validate each agent's output before calculating scores:
 
+### JSON Block Extraction (Primary)
+
+Each agent MUST include a machine-readable JSON summary in a fenced code block tagged `agent-output`. This is the **primary data source** for scores and issues.
+
+1. **Extract JSON**: Search the agent output for a fenced block starting with ` ```agent-output `. Parse the JSON inside it.
+2. **Validate schema**: Check all required fields per `output-schema.md` — `name`, `score`, `issueCount`, `issues` array with all required issue fields (`id`, `severity`, `category`, `title`, `location`, `problem`, `impact`, `fix`, `fixability`, `effort`, `confidence`).
+3. **Validate counts**: Verify that `issueCount` matches the actual count of issues in the array by severity.
+4. **Validate score bounds**: Score must be 0-100. Recalculate from deductions if out of bounds.
+
+If the JSON block is **missing or malformed**, fall back to markdown parsing and add a warning to the report: "⚠ Score for {category} derived from markdown parsing — may be imprecise."
+
 ### Completeness Check
 
 For each agent, verify:
@@ -774,10 +1049,31 @@ When one or more categories are incomplete:
 
 ### Deduplication
 
-If multiple agents report the same issue (same file, same problem):
-- Keep the issue in the category where it has the **highest priority level**
-- Remove the duplicate from the other category
-- If same priority, keep it in the category that owns it per the weight table (e.g., image alt text → Image Optimization, not Meta & Structured Data)
+Each agent outputs issues with canonical IDs (format: `{check-name}:{file-path}:{line-number}`). The orchestrator uses these IDs for precise cross-agent deduplication:
+
+1. Collect all issue IDs across all agent outputs
+2. If two or more agents report the same ID (exact match on check-name + file-path + line-number):
+   - Keep the issue in the category where it has the **highest priority level**
+   - Remove the duplicate from the other category
+   - If same priority, keep it in the category that owns it per the weight table and AEO ownership rules
+3. If IDs differ but the same file + same line range (±5 lines) appears in two agents:
+   - Treat as a potential duplicate — compare problem descriptions
+   - If describing the same root cause, deduplicate using ownership rules
+   - If describing different aspects of the same code, keep both
+
+### Cross-Agent Reconciliation
+
+After deduplication, check for logical consistency across agent findings:
+
+**Client rendering cascade**: If `web-seo-performance` flags a page as client-rendered (no SSR), and `web-seo-technical` flags missing metadata on that same page — link them. The metadata issue may be a consequence of client rendering. In the report, note: "Fixing client-side rendering (Performance) will also resolve the metadata issue."
+
+**AEO ↔ SSR coherence**: If `web-seo-aeo` notes "AI crawlers see empty pages" and `web-seo-performance` flags the same pages for client rendering — do not present these as independent problems. Consolidate under Performance with an AEO impact note.
+
+**Contradictory severity**: If two agents assess the same root cause at different severities (e.g., performance says MEDIUM for a pattern, framework says HIGH), use the higher severity but note both perspectives.
+
+**Structured data split**: `web-seo-technical` owns schema format/validation, `web-seo-aeo` owns entity properties. If both flag the same JSON-LD block — technical for format issues and AEO for missing entity properties — keep both but group them visually in the report under the same file location.
+
+**Redirect/crawlability chain**: If technical agent finds redirect issues AND performance agent finds slow TTFB — check if they're related (redirect chains cause slow TTFB). If so, consolidate and note the causal chain.
 
 ## Report Format
 
@@ -808,6 +1104,16 @@ Use this template for the full audit report:
 
 ---
 
+## Executive Summary
+
+{2-3 sentences describing the overall SEO health in business terms. Focus on impact, not technical details. Examples:}
+- "Your site has solid technical SEO foundations but significant performance issues that likely affect Google rankings. The product listing page — your highest-traffic page — is invisible to search engines due to client-side rendering."
+- "AI search engines (ChatGPT, Perplexity) currently cannot cite your content because retrieval bots are blocked. This means you are missing an emerging traffic channel."
+
+**Estimated ranking impact**: {Qualitative assessment: "These issues are likely suppressing rankings for key pages" or "Your technical foundation is strong; improvements would be incremental."}
+
+---
+
 ## Core Web Vitals Risk Assessment
 
 | Metric | Risk Level | Key Factors |
@@ -820,35 +1126,120 @@ Use this template for the full audit report:
 
 ## Critical Issues ({count})
 
-{List all CRITICAL issues here, sorted by impact}
+{List all CRITICAL issues here in full format, sorted by category then file path}
 
 ## High Priority Issues ({count})
 
-{List all HIGH issues here}
+{List all HIGH issues here in full format}
 
 ## Medium Priority Issues ({count})
 
-{List all MEDIUM issues here}
+{List all MEDIUM issues here in full format. If >10: show top 10 by impact in full format, group remaining as summary with representative code example.}
 
 ## Low Priority Issues ({count})
 
-{List all LOW issues here}
+{List all LOW issues here in full format. If >10: show top 10 in full format, list remaining as compact bullets.}
+
+---
+
+## Page Health Overview
+
+{Show only when 3+ pages have issues. Identify the worst pages by issue density.}
+
+| Page | Critical | High | Medium | Low | Top Issue |
+|------|----------|------|--------|-----|-----------|
+| {file path} | {n} | {n} | {n} | {n} | {brief description of worst issue} |
+| {file path} | {n} | {n} | {n} | {n} | {brief description} |
+| ... | ... | ... | ... | ... | ... |
+
+{Show top 5 worst pages. This helps developers prioritize which files to fix first.}
 
 ---
 
 ## Summary & Recommendations
 
-### Top 3 Priorities
+### Top 3 Priorities (in order)
 1. {Most impactful fix with expected benefit}
+   - **Unblocks**: {list of other issues this fix enables, if any}
+   - **Effort**: {trivial/small/medium/large}
 2. {Second most impactful fix}
+   - **Effort**: {trivial/small/medium/large}
 3. {Third most impactful fix}
+   - **Effort**: {trivial/small/medium/large}
+
+### Fix Dependencies
+{If any issues must be resolved in a specific order, list the dependency chain:}
+- Fix A → enables Fix B → enables Fix C
 
 ### Quick Wins
-- {Easy fixes that improve score quickly}
+- {Easy fixes (trivial/small effort) that improve score quickly}
 
 ### Long-term Improvements
 - {Architectural changes for sustained improvement}
+
+---
+
+## Audit Summary (JSON)
+
+{Machine-readable summary for CI/CD integration. Output inside a fenced code block tagged `json`:}
+
+\`\`\`json
+{
+  "score": {overall_score},
+  "grade": "{grade}",
+  "status": "{PASS|WARNING|FAIL}",
+  "date": "{current date}",
+  "framework": "{framework}",
+  "frameworkVersion": "{version}",
+  "categories": {
+    "technical-seo": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
+    "performance": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
+    "framework-patterns": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
+    "meta-structured-data": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
+    "image-optimization": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
+    "ai-search-readiness": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } }
+  },
+  "cwvRisk": { "lcp": "{LOW|MEDIUM|HIGH}", "inp": "{LOW|MEDIUM|HIGH}", "cls": "{LOW|MEDIUM|HIGH}" },
+  "issueCount": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n}, "total": {n} }
+}
+\`\`\`
 ```
+
+### Issue Sort Order
+
+Within each priority level, sort issues by:
+1. Category (Technical SEO → Performance → {Framework} → Meta & Structured Data → Image Optimization → AI Search Readiness)
+2. File path (alphabetical)
+3. Line number (ascending)
+
+This ensures identical issues appear in the same position across runs, making before/after comparisons reliable.
+
+### Report Length Management
+
+When the total issue count exceeds 30:
+1. Show ALL CRITICAL and HIGH issues in full format
+2. For MEDIUM issues: show the top 10 (by impact) in full format; group remaining as a summary (e.g., "5 additional images missing alt attributes across components/") with one representative code example
+3. For LOW issues: show the top 10 in full format; list remaining as compact bullet points
+4. Add a "Full Issue List" collapsible section (`<details>`) at the end with all issues in full format for developers who want the complete picture
+
+### Audit History Comparison
+
+At the end of each audit, check for a previous audit summary in the project:
+- `glob: .seo-audit-history.json`
+
+If found, read it and add a "Score Trend" section to the report before the Summary:
+
+```markdown
+## Score Trend
+
+| Date | Overall | Technical | Performance | Meta | Images | AEO |
+|------|---------|-----------|-------------|------|--------|-----|
+| {previous date} | {score} | {score} | ... | ... | ... | ... |
+| {current date} | {score} | {score} | ... | ... | ... | ... |
+| **Change** | **{+/-delta}** | ... | ... | ... | ... | ... |
+```
+
+After the report, offer: "Save this audit result for future comparison? (creates/updates `.seo-audit-history.json`)"
 
 ## Score Calculation Rules
 
@@ -862,6 +1253,23 @@ Read `references/quality-gates.md` for the full scoring methodology. Key rules:
 6. If a category is incomplete, redistribute its weight proportionally across available categories
 7. Apply grade scale: A+ (95-100) through F (0-49)
 8. Apply status: PASS (80+), WARNING (60-79), FAIL (0-59)
+
+## Reference Staleness Checks
+
+During framework detection, verify that the project's SEO-related dependencies are not severely outdated, as this affects which checks and advice are relevant:
+
+**Framework version staleness**:
+- If detected `next` version < 13: note "Next.js version is pre-App Router. Consider upgrading for improved SEO capabilities (metadata API, Server Components)." — informational, not scored
+- If detected `next` version < 14 but >= 13: note available improvements in 14+ (partial prerendering, improved metadata)
+- If detected `nuxt` version < 3: note "Nuxt 2 is in maintenance mode. Nuxt 3 has improved SEO features (useHead composable, Nitro prerendering)."
+
+**Dependency staleness**:
+- Check `package.json` for known SEO-related packages with major version gaps:
+  - `next-seo` — if using v5 with Next.js 14+, note that built-in metadata API is preferred
+  - `react-helmet` / `react-helmet-async` — if using with Next.js App Router, note these don't work with Server Components
+  - `schema-dts` — informational: newer versions may have updated schema types
+
+Report staleness findings as informational notes in the report header, NOT as scored issues. These help users understand the context of the audit.
 
 ## Important Notes
 

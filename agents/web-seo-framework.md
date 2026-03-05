@@ -32,6 +32,43 @@ The orchestrator provides these reference files in your agent prompt:
 
 The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src/`, `packages/web/`, or empty for root-level). **Prepend this prefix to all path patterns** in your analysis.
 
+## Verification Protocol
+
+After detecting a potential issue via grep, you MUST verify it before reporting:
+
+1. **Read the file** — read at least ±10 lines around the grep match to confirm the issue exists in context
+2. **Check surrounding code** — framework APIs may be used in non-obvious ways (e.g., metadata in a parent layout, image optimization via a wrapper component)
+3. **Check for comments/disabled code** — do not flag patterns inside comments or dead code
+4. **Exclude test/mock files** — apply the file exclusion patterns provided by the orchestrator
+5. **Assign confidence** — HIGH if you read the file and traced imports, MEDIUM if you read match context only, LOW if grep-only
+
+Never report an issue based solely on a grep match without reading the surrounding context.
+
+## Import & Dependency Tracing
+
+Before reporting "missing framework API usage" issues:
+
+1. **Check parent layouts** — in App Router, metadata can be inherited from any parent `layout.tsx`. A page without `export const metadata` may correctly inherit from its layout.
+2. **Check wrapper components** — a custom `<Image>` wrapper may internally use `next/image` with correct props
+3. **Check framework config** — `next.config.js` may configure image optimization, headers, redirects that handle the flagged concern
+4. **Check third-party libraries** — `next-seo`, `next-sitemap`, `next-intl` may provide the feature via a different API
+5. **If a provider is found** — read it to confirm it provides the feature before clearing the finding
+
+## Applicability Checks
+
+Before reporting a "missing X" issue, verify the feature is relevant:
+
+| Check | Only flag if... |
+|-------|----------------|
+| Missing `generateStaticParams` | The dynamic route has a finite, known set of params (not user-generated infinite content) |
+| Missing `loading.tsx` | The page or layout has async Server Components or data fetching |
+| Missing OG image generation | The route has content worth generating OG images for (not utility/API routes) |
+| Missing `Suspense` boundaries | Below-fold async content exists that would benefit from streaming |
+| Excessive `'use client'` | Count excludes files that genuinely need client interactivity (form handlers, animations, state) |
+| Barrel file re-exports | The barrel file is actually imported by Server Components (not only by Client Components) |
+
+If the feature is not applicable, omit the finding entirely.
+
 ## Analysis Protocol
 
 ### Step 0: Verify Framework and Version
@@ -57,6 +94,21 @@ For each check:
 3. Classify issues by priority (CRITICAL / HIGH / MEDIUM / LOW)
 4. Include file path, line number, problem, impact, fix, and fixability
 
+#### Next.js: Metadata Template Inheritance
+
+When checking for missing metadata on pages, account for the App Router metadata merge system:
+- Parent layouts can define `title: { template: '%s | Site Name', default: 'Site Name' }` — child pages only need to override `title` as a string
+- `openGraph`, `twitter`, and `alternates` set in a parent layout are inherited by child pages
+- Do NOT flag a child page as "missing OG tags" if its parent layout already provides them
+- Read the nearest parent `layout.tsx` before flagging any metadata gap on a page
+
+#### Next.js: generateStaticParams Context
+
+Before flagging a missing `generateStaticParams`:
+- If the route param name suggests user-generated content (`[userId]`, `[username]`, `[commentId]`, `[sessionId]`, `[token]`), do NOT flag — these cannot be statically enumerated
+- If the route uses `dynamicParams = true` alongside `generateStaticParams`, that is correct for routes where some params are known but new ones are created over time
+- Only flag when the route clearly serves a finite, editorially-controlled content set (e.g., `[slug]` with a CMS, `[category]` with a fixed list)
+
 ### Step 2: Framework Configuration Analysis
 
 Check the framework's main config file:
@@ -66,6 +118,11 @@ Check the framework's main config file:
 - Astro: `astro.config.{mjs,ts}`
 
 Look for SEO-relevant configuration: image optimization, redirects, headers, i18n, build output settings.
+
+**Next.js: Turbopack awareness** (v15+):
+- Check for `turbo` or `experimental.turbo` in `next.config.{js,mjs,ts}`
+- Check for `--turbopack` in `package.json` scripts
+- If Turbopack is enabled: `@next/bundle-analyzer` does not work with Turbopack — do not flag its absence as an issue
 
 ### Step 3: Cross-Router Analysis (Next.js only)
 
@@ -94,3 +151,25 @@ For each issue, include:
 - A code example showing the fix
 
 End with a summary of the top 3-5 most impactful framework-specific improvements.
+
+### Machine-Readable JSON Block
+
+After the markdown report, you MUST include a machine-readable JSON summary inside a fenced code block tagged `agent-output`. The orchestrator extracts scores and issues from this JSON — not from parsing markdown. See `output-schema.md` for the full schema.
+
+Your JSON block must include one category matching the framework name (e.g., `"Next.js Patterns"`, `"Nuxt Patterns"`, `"Gatsby Patterns"`, `"Astro Patterns"`). The category needs `name`, `score`, `issueCount`, and `issues` array. Every issue must have all required fields: `id`, `severity`, `category`, `title`, `location`, `problem`, `impact`, `fix`, `fixability`, `effort`, `confidence`.
+
+Example:
+````
+```agent-output
+{
+  "categories": [
+    {
+      "name": "Next.js Patterns",
+      "score": 80,
+      "issueCount": { "critical": 0, "high": 1, "medium": 3, "low": 1 },
+      "issues": [ ... ]
+    }
+  ]
+}
+```
+````

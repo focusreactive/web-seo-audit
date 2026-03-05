@@ -127,10 +127,10 @@ The `aeo` command checks how visible your site is to AI-powered search engines �
 ```
 
 ```
-AI Search Readiness: 77/100 — WARNING
-Issues: 0C 1H 4M 3L
+AI Search Readiness: 82/100 — PASS
+Issues: 0C 0H 5M 3L
 
-[HIGH] No llms.txt file
+[MEDIUM] No llms.txt file
   Affects:   Training bots + Retrieval bots
   Problem:   No llms.txt at /llms.txt. AI systems have no structured way
              to discover site content, key pages, or documentation.
@@ -224,15 +224,63 @@ Any command accepts an optional `<url>` at the end — when provided, live websi
 | `/web-seo-audit`                 | Full audit — all 6 categories, scored report                    |
 | `/web-seo-audit fix`             | Audit, auto-fix issues, re-audit — iterative cycle              |
 | `/web-seo-audit fix --target 90` | Fix cycle with custom target score (default: 80)                |
+| `/web-seo-audit fix --dry-run`   | Show fix plan without applying changes                          |
+| `/web-seo-audit fix --category "Performance"` | Fix only issues in one category                  |
+| `/web-seo-audit fix --severity HIGH` | Fix only CRITICAL and HIGH issues                           |
+| `/web-seo-audit diff`            | Incremental — analyze only files changed since `main`           |
+| `/web-seo-audit diff feature/x`  | Incremental — analyze changes since a specific branch/commit    |
 | `/web-seo-audit nextjs`          | Next.js deep check — metadata API, Server Components            |
 | `/web-seo-audit cwv`             | Core Web Vitals focus — LCP, INP, CLS risk analysis             |
 | `/web-seo-audit meta`            | Meta tags & structured data — title, OG, Twitter, JSON-LD       |
 | `/web-seo-audit images`          | Image optimization — format, sizing, lazy loading, alt text     |
 | `/web-seo-audit aeo`             | AI search readiness — llms.txt, AI crawlers, entity data        |
 | `/web-seo-audit perf`            | Performance analysis — CWV patterns, bundle size, loading       |
-| `/web-seo-audit page <path>`     | Single page analysis — inline check, no agents spawned          |
+| `/web-seo-audit page <path>`     | Single page deep analysis — traces imports 3 levels deep        |
 
 Example with URL: `/web-seo-audit cwv https://example.com` — code-level CWV analysis + CrUX field data correlation.
+
+## Configuration
+
+### Suppress known issues
+
+Create `.seo-audit-ignore` at your project root:
+
+```
+# Suppress by issue ID
+missing-sitemap:site-wide
+raw-img:components/TeamSection.tsx:14
+
+# Suppress all instances of a check
+missing-lang:*
+
+# Suppress all issues in a file
+*:components/LegacyWidget.tsx:*
+```
+
+Suppressed issues are still detected but don't affect scores.
+
+### Custom rules
+
+Create `.seo-audit-config.yaml` at your project root:
+
+```yaml
+severity:
+  missing-llms-txt: LOW          # Override severity
+
+disable:
+  - missing-csp                  # Skip checks you handle elsewhere
+
+weights:
+  technical-seo: 30              # Custom category weights
+  performance: 25
+  meta-structured-data: 20
+  image-optimization: 10
+  ai-search-readiness: 15
+
+focus-pages:                     # Prioritize key pages
+  - app/page.tsx
+  - app/products/[slug]/page.tsx
+```
 
 ## What it checks
 
@@ -337,7 +385,8 @@ web-seo-audit/
 │           ├── schema-types.md  # JSON-LD validation
 │           ├── aeo-patterns.md  # AI search readiness patterns
 │           ├── fix-classification.md # Fix cycle classification rules
-│           └── framework-checks.md # Framework-conditional check registry
+│           ├── framework-checks.md # Framework-conditional check registry
+│           └── output-schema.md # Agent output JSON contract
 ├── agents/
 │   ├── web-seo-technical.md     # Technical SEO agent
 │   ├── web-seo-performance.md   # Performance agent

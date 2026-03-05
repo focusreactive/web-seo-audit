@@ -47,6 +47,45 @@ The orchestrator provides the detected framework. When the framework is **Eleven
 
 **Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
 
+## Verification Protocol
+
+After detecting a potential issue via grep, you MUST verify it before reporting:
+
+1. **Read the file** — read at least ±10 lines around the grep match to confirm the issue exists in context
+2. **Check surrounding code** — structured data properties may be dynamically set, spread from variables, or conditionally included
+3. **Check for comments/disabled code** — do not flag patterns inside comments or dead code
+4. **Exclude test/mock files** — apply the file exclusion patterns provided by the orchestrator
+5. **Assign confidence** — HIGH if you read the file and traced imports, MEDIUM if you read match context only, LOW if grep-only
+
+Never report an issue based solely on a grep match without reading the surrounding context.
+
+## Import & Dependency Tracing
+
+Before reporting "missing structured data property" or "missing AI feature" issues:
+
+1. **Check shared components** — structured data may be built in a shared `<JsonLd>`, `<Schema>`, or `<SEO>` component that adds entity properties
+2. **Check data files** — `sameAs`, `@id`, `mainEntityOfPage` may be defined in data files or CMS schemas, not inline in page components
+3. **Check libraries** — `next-seo`, `schema-dts`, `nuxt-schema-org` may add entity properties automatically
+4. **Check layout inheritance** — Organization schema may be in a root layout, not in individual pages
+5. **If a provider is found** — read it to confirm it actually includes the entity property before clearing the finding
+
+## Applicability Checks
+
+Before reporting a "missing X" issue, verify the feature is relevant to this project:
+
+| Check | Only flag if... |
+|-------|----------------|
+| Missing FAQPage schema | Actual Q&A content patterns exist on the page (question headings, Q&A lists) |
+| Missing HowTo schema | Actual step-by-step/tutorial content exists (ordered lists with instructional content) |
+| Missing author pages | The site has blog/article/editorial content |
+| Missing `speakable` markup | The site has informational content suitable for voice answers (not pure e-commerce or SaaS) |
+| Missing `llms-full.txt` | The site is documentation-heavy, enterprise, or has substantial content worth expanding |
+| Missing question-format headings | The page is content-heavy (blog, docs, guide) — not UI-focused (dashboard, settings, checkout) |
+| Missing `<article>` wrapper | The page contains self-contained editorial content (blog post, news article) |
+| Content behind JS interactions | The hidden content is substantive (FAQ answers, key content sections) — not minor UI affordances |
+
+If the feature is not applicable to this project type, omit the finding entirely — do not report it as LOW.
+
 ## Analysis Protocol
 
 ### Step 1: Project Discovery
@@ -73,7 +112,7 @@ grep: "application/ld.json|@context.*schema.org" app/**/*.{tsx,jsx} pages/**/*.{
 
 **Check for llms.txt existence**:
 - `glob: public/llms.txt` or `glob: app/llms.txt/route.{ts,js}` or `glob: pages/api/llms.{ts,js}`
-- If missing: HIGH — AI systems cannot discover structured information about the site
+- If missing: MEDIUM — AI systems cannot discover structured information about the site (emerging best practice, not an established requirement)
 
 **If llms.txt exists, validate format**:
 - First line must be H1 heading (`# {Name}`)
@@ -222,3 +261,25 @@ For each issue, include:
 - A code example showing the fix
 
 End with a summary of the top 3-5 most impactful AEO improvements, prioritized by AI search visibility impact.
+
+### Machine-Readable JSON Block
+
+After the markdown report, you MUST include a machine-readable JSON summary inside a fenced code block tagged `agent-output`. The orchestrator extracts scores and issues from this JSON — not from parsing markdown. See `output-schema.md` for the full schema.
+
+Your JSON block must include one category: `"AI Search Readiness"`. The category needs `name`, `score`, `issueCount`, and `issues` array. Every issue must have all required fields: `id`, `severity`, `category`, `title`, `location`, `problem`, `impact`, `fix`, `fixability`, `effort`, `confidence`.
+
+Example:
+````
+```agent-output
+{
+  "categories": [
+    {
+      "name": "AI Search Readiness",
+      "score": 72,
+      "issueCount": { "critical": 1, "high": 0, "medium": 3, "low": 2 },
+      "issues": [ ... ]
+    }
+  ]
+}
+```
+````

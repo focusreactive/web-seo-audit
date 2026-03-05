@@ -38,6 +38,28 @@ Each category starts at 100. Issues deduct points based on priority:
 | MEDIUM | -3 | Max 10 issues counted | Moderate impact, should fix but not urgent |
 | LOW | -1 | Max 10 issues counted | Minor improvements, best practices |
 
+### Deduction Scope
+
+**Per-template, not per-instance**: Deduct once per unique page template/type, not once per page instance. For example:
+- "Blog posts missing Article schema" = 1 HIGH deduction (not N deductions for N blog posts)
+- "Product pages missing Product schema" = 1 HIGH deduction
+- "Homepage missing Organization schema" = 1 HIGH deduction
+
+This prevents scores from being dominated by content volume rather than architectural gaps.
+
+### MEDIUM/LOW Issue Prioritization
+
+When a category has more than 10 MEDIUM (or LOW) issues, apply deductions for the 10 with the highest impact. Prioritize by:
+1. Issues affecting more pages/templates first
+2. Issues with higher confidence first
+3. Issues with `auto-fix` or `confirm-fix` fixability first (actionable issues matter more)
+
+Report ALL found issues for transparency, but note which 10 count toward the score.
+
+### Compound Penalty
+
+If a page template has zero SEO setup (no title, no description, no OG, no structured data, no canonical), report as a single CRITICAL (-15) "No SEO configuration on {page type}" rather than 5+ individual HIGH/MEDIUM issues. This avoids over-counting and better reflects the severity of a completely unconfigured page. The individual missing items should still be listed as sub-points within the finding for fix guidance.
+
 ### Deduction Examples
 
 **CRITICAL (-15 each)**
@@ -109,14 +131,14 @@ Each category starts at 100. Issues deduct points based on priority:
 
 ### AEO-Specific Deduction Examples
 
+**AEO Severity Philosophy**: AEO checks represent emerging best practices, not established requirements. Most items should be LOW or MEDIUM (opportunities) rather than HIGH (deficiencies). Reserve CRITICAL for actions that actively harm AI visibility (blocking retrieval bots). The absence of `llms.txt`, `speakable` markup, and question headings is the current norm — not a deficiency.
+
 **CRITICAL (-15 each)**
 - AI retrieval bots (ChatGPT-User, PerplexityBot, ClaudeBot) explicitly blocked via robots.txt `Disallow: /`
 - Blanket `Disallow: /` under `User-agent: *` with no specific `Allow` rules for AI retrieval bots
 
-**HIGH (-8 each)**
-- No `llms.txt` file (AI systems can't discover structured site information)
-
 **MEDIUM (-3 each, max 10)**
+- No `llms.txt` file (AI systems can't discover structured site information — emerging best practice)
 - Organization schema missing `sameAs` (AI can't verify entity identity)
 - Articles missing `dateModified` (AI deprioritizes undated content)
 - No `<main>` element (AI can't identify primary content area)
@@ -256,25 +278,81 @@ Every issue MUST follow this structure:
 ```
 ### [PRIORITY] Category: Brief Description
 
+- **ID**: `{check-name}:{file-path}:{line-number}` (e.g., `img-alt:components/Hero.tsx:15`) or `{check-name}:site-wide`
 - **Location**: `file/path.tsx:42` or "site-wide"
 - **Problem**: What is wrong and why it matters
 - **Impact**: How this affects SEO, performance, or user experience
 - **Fix**: Specific code change or action to resolve
 - **Fixability**: auto-fix | confirm-fix | manual
+- **Effort**: trivial | small | medium | large
+- **Confidence**: HIGH | MEDIUM | LOW
 
 <details>
-<summary>Code example</summary>
+<summary>Code evidence</summary>
 
 \`\`\`tsx
-// Before (problematic) — file/path.tsx:42-48
-...
+// Before (actual code from project) — file/path.tsx:42-48
+{paste the actual code found in the project file}
 
 // After (fixed)
-...
+{the same actual code with the fix applied}
 \`\`\`
 
 </details>
 ```
+
+### Canonical Issue ID
+
+Every issue must have a unique canonical ID for cross-agent deduplication. Format: `{check-name}:{file-path}:{line-number}`. The orchestrator matches IDs across agents — if two agents report the same ID, ownership rules determine which category scores it.
+
+Check name should be a short kebab-case identifier for the check (e.g., `img-alt`, `missing-meta-desc`, `no-ssr`, `blocked-ai-bot`, `missing-llms-txt`).
+
+### Confidence Levels
+
+Each finding must declare its confidence level:
+
+| Level | Criteria | Severity Cap |
+|-------|----------|-------------|
+| HIGH | Issue confirmed by reading the actual file content and tracing imports/dependencies | No cap |
+| MEDIUM | Pattern detected by grep, confirmed by reading the match context (surrounding lines), but imports/dependencies not fully traced | Cap at HIGH (no CRITICAL) |
+| LOW | Pattern detected by grep only, full file context not verified | Cap at MEDIUM (no CRITICAL or HIGH) |
+
+**Rules**:
+- If >30% of findings in a category are LOW confidence, add a note: "Some findings in this category have lower detection confidence — manual review recommended"
+- LOW confidence findings must never be classified as CRITICAL or HIGH — downgrade automatically
+- MEDIUM confidence findings must never be classified as CRITICAL — downgrade to HIGH
+
+### Code Evidence Requirements
+
+The "Before" code in every issue MUST be the actual code found in the project file, not a generic example. Copy the exact lines from the file at the reported path and line range.
+
+The "After" code must be the specific fix applied to the actual project code.
+
+**Never** use placeholder code like `export default function Page() { ... }` — always show the real code. If the issue is site-wide (no single file), show one representative example from the actual codebase.
+
+### Effort Estimates
+
+| Effort | Definition | Examples |
+|--------|-----------|----------|
+| trivial | < 5 min, single attribute or line change | Add `lang`, add `loading="lazy"`, add `priority` prop |
+| small | 5-30 min, single file change | Add JSON-LD block, create `llms.txt`, add meta description |
+| medium | 30 min - 2 hours, multiple files | Replace `<img>` with `next/image` across components, add `generateStaticParams` |
+| large | > 2 hours, architectural change | Convert SPA to SSR, restructure component tree, add i18n |
+
+### Full Format Requirement
+
+Every issue, regardless of priority level, MUST include the complete format (ID, Location, Problem, Impact, Fix, Fixability, Effort, Confidence, and Code evidence). Do not abbreviate MEDIUM or LOW issues to one-liners.
+
+When there are many issues of the same type (e.g., "8 images missing alt text"), group them into a single finding with all affected locations listed, but still provide one representative code example from the actual codebase.
+
+## Score Sanity Checks
+
+After calculating all category and overall scores, apply these overrides:
+
+1. **CRITICAL cap**: If a category has any CRITICAL issue, cap that category's status at WARNING (score ≤ 79) — a category with unresolved CRITICAL issues must never show PASS
+2. **Multi-CRITICAL cap**: If the overall report has ≥2 CRITICAL issues across any categories, cap the overall status at WARNING
+3. **Empty confirmed**: If a category has 0 issues AND the agent confirmed it checked all applicable patterns, score is 100 — do not penalize for "nothing found" when checks actually ran
+4. **Confidence adjustment**: If >50% of a category's deductions come from LOW confidence findings, add a warning note and consider the score provisional
 
 ## Score Calculation
 
@@ -284,6 +362,13 @@ overall_score = round(sum(category_score * category_weight))
 ```
 
 When calculating, apply deduction caps for MEDIUM and LOW issues per category, not globally.
+
+### Score Stability Guidelines
+
+To minimize score variance between runs on the same codebase:
+1. **Deterministic checks first**: Binary checks (file exists / does not exist, attribute present / absent) should be the primary score drivers. These are fully reproducible.
+2. **Judgment-based checks clearly marked**: Checks that require LLM judgment (e.g., "content is thin", "heading hierarchy is poor") should be flagged with Confidence: MEDIUM and should not contribute more than 20% of total deductions in any category.
+3. **Report variance warning**: If a re-audit produces a score differing by more than 5 points from a previous run (with no code changes), note: "Score variance detected — this may reflect detection sensitivity differences, not actual quality changes."
 
 ### Rounding
 

@@ -97,6 +97,33 @@ This reference defines which checks each agent should run based on the detected 
 - Data: `src/_data/**/*.{js,json}`, `_data/**/*.{js,json}`
 - Config: `.eleventy.js`, `eleventy.config.{js,mjs,cjs}`
 
+#### Remix
+
+| Check | Version | Priority | Description |
+|-------|---------|----------|-------------|
+| `meta()` export | 2+ | HIGH | Routes should export `meta()` function for title/description |
+| `loader` for data | any | HIGH | Pages should use `loader` for server-side data, not client-side fetch |
+| `<Link>` usage | any | MEDIUM | Internal links should use Remix `<Link>` not `<a>` |
+| `links()` for assets | any | MEDIUM | Use `links()` export for preloading critical assets |
+| Error boundaries | any | MEDIUM | Routes should have `ErrorBoundary` exports |
+
+#### SvelteKit
+
+| Check | Version | Priority | Description |
+|-------|---------|----------|-------------|
+| `+page.server.ts` data | any | HIGH | Pages should use server load functions for SEO-critical data |
+| `<svelte:head>` | any | HIGH | Pages must use `<svelte:head>` for meta tags |
+| Prerendering | any | MEDIUM | Static-eligible pages should have `export const prerender = true` |
+| `<a>` with `data-sveltekit-preload-data` | any | LOW | Internal links benefit from preloading hints |
+
+#### Qwik
+
+| Check | Version | Priority | Description |
+|-------|---------|----------|-------------|
+| `routeLoader$` usage | any | HIGH | Pages should use `routeLoader$` for server data |
+| `<head>` in layout | any | HIGH | Layout must include proper `<head>` with meta tags |
+| `useDocumentHead` | any | MEDIUM | Dynamic pages should set head via `useDocumentHead` |
+
 #### SPA Frameworks (React, Vue, Angular, Svelte)
 
 | Check | Framework | Priority | Description |
@@ -231,7 +258,7 @@ All AEO checks are universal — they apply regardless of framework. The framewo
 
 | Check | Priority | Description |
 |-------|----------|-------------|
-| `llms.txt` exists | HIGH | Must have `/llms.txt` for AI discovery |
+| `llms.txt` exists | MEDIUM | Should have `/llms.txt` for AI discovery (emerging best practice) |
 | `llms.txt` format validation | MEDIUM | Must follow spec (H1, blockquote, markdown links) |
 | `llms-full.txt` exists | LOW | Extended version for comprehensive AI context |
 | AI retrieval bot rules | CRITICAL | ChatGPT-User, PerplexityBot, ClaudeBot must not be blocked |
@@ -278,6 +305,9 @@ This agent is spawned ONLY when a recognized framework is detected. It runs deep
 | Nuxt | Yes | Composables, auto-imports, Nitro, NuxtLink, NuxtImg |
 | Gatsby | Yes | GraphQL layer, plugin ecosystem, image pipeline |
 | Astro | Yes | Island architecture, content collections, integrations |
+| Remix | No | SSR meta-framework — detected to avoid false "No SSR" CRITICAL, but uses universal checks. Dedicated agent support planned. |
+| SvelteKit | No | SSR meta-framework — detected to avoid false "No SSR" CRITICAL, but uses universal checks. Dedicated agent support planned. |
+| Qwik | No | Resumable framework — detected to avoid false "No SSR" CRITICAL, but uses universal checks. Dedicated agent support planned. |
 | Eleventy | No | Template-based SSG — universal agents cover all checks with Eleventy-specific file patterns. No dedicated agent needed. |
 | React (no meta-framework) | No | Universal agents cover SPA checks |
 | Vue (no meta-framework) | No | Universal agents cover SPA checks |

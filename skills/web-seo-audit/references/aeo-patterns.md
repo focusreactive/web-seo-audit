@@ -22,6 +22,8 @@ glob: app/llms.txt/route.{ts,js}
 glob: pages/api/llms.{ts,js}
 ```
 
+**Severity**: MEDIUM — `llms.txt` is an emerging best practice for AI discovery. Its absence is the current norm, not a critical deficiency. Reserve HIGH/CRITICAL for actions that actively harm AI visibility (blocking retrieval bots).
+
 **Format rules**:
 - First line: `# {Site/Organization Name}` (H1 heading)
 - Second section: `> {Brief description}` (blockquote, one-liner describing the site)

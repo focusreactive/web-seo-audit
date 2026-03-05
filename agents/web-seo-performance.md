@@ -28,6 +28,8 @@ The orchestrator provides these reference files in your agent prompt:
 
 **Boundary — Framework Performance Antipatterns**: Framework-specific performance antipatterns (e.g., excessive `'use client'` boundaries, layout fetch caching, barrel file re-exports, dynamic import misuse for above-fold components, provider nesting, heavy `_app.tsx` imports, icon library imports, `getServerSideProps` overuse) are owned by `web-seo-framework`. Do not duplicate those checks. You own general CWV patterns, bundle size, image optimization, and non-framework-specific performance issues. When no framework agent is spawned (plain React, Vue, Angular, Svelte, static HTML), you also run the framework-specific performance checks provided in your `{{performanceChecks}}` list.
 
+**When `web-seo-framework` IS spawned**: Do NOT run any checks from the `{{performanceChecks}}` list that are tagged as framework-specific (e.g., checks with version gates like "Next.js v13+"). Only run universal performance checks. The orchestrator strips framework-specific checks from `{{performanceChecks}}` in this case to prevent overlap.
+
 ## Path Convention
 
 The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src/`, `packages/web/`, or empty for root-level). **Prepend this prefix to all path patterns** in your analysis. For example:
@@ -49,6 +51,20 @@ Static site generators (Eleventy, Gatsby, Astro static, Hugo, Jekyll) and JAMsta
   - "No SSR/SSG" CRITICAL check must NOT fire for SSG projects — they ARE pre-rendered by definition
 - **Do NOT undercount real issues**: Image optimization (missing dimensions, no lazy loading, no modern formats) and render-blocking resources still matter equally on SSGs. CLS issues are framework-agnostic.
 
+### SSG with Client Hydration
+
+Some SSGs ship significant JavaScript despite pre-rendering HTML:
+- **Gatsby**: Ships the React runtime + page data JSON for client-side routing. Bundle size matters equally to SSR apps.
+- **Next.js SSG (`output: 'export'`)**: Ships React runtime for hydration. Same bundle concerns as SSR.
+- **Astro with islands**: Only ships JS for `client:*` components. Minimal overhead unless many `client:load` islands exist.
+- **Eleventy with web components or imported React**: Check if JS frameworks are imported in templates.
+
+**Detection**:
+- If Gatsby → treat bundle size concerns at normal severity (it ships React)
+- If Next.js with `output: 'export'` → treat as normal Next.js (React ships)
+- If Astro → check `client:load` count; many `client:load` islands = potential bundle concern (MEDIUM)
+- If Eleventy with no JS framework imports → treat as pure SSG (reduced bundle concerns)
+
 ## Template Engine Adaptation
 
 The orchestrator provides the detected framework. When the framework is **Eleventy (11ty)** or another template-based SSG, adapt ALL grep/glob patterns to search the correct file extensions:
@@ -59,6 +75,45 @@ The orchestrator provides the detected framework. When the framework is **Eleven
 - Static assets: Check passthrough copy directories (often `src/static/`, `src/assets/`, `public/`)
 
 **Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
+
+## Verification Protocol
+
+After detecting a potential issue via grep, you MUST verify it before reporting:
+
+1. **Read the file** — read at least ±10 lines around the grep match to confirm the issue exists in context
+2. **Check surrounding code** — the flagged pattern may be handled nearby (e.g., `width`/`height` on separate lines from `<img`, `priority` passed as a prop from a parent)
+3. **Check for comments/disabled code** — do not flag patterns inside comments or dead code paths
+4. **Exclude test/mock files** — apply the file exclusion patterns provided by the orchestrator
+5. **Assign confidence** — HIGH if you read the file and traced imports, MEDIUM if you read match context only, LOW if grep-only
+
+Never report an issue based solely on a grep match without reading the surrounding context.
+
+## Import & Dependency Tracing
+
+Before reporting "missing optimization" issues:
+
+1. **Check for image optimization libraries** — `next/image` (Next.js), `@11ty/eleventy-img` (Eleventy), `gatsby-plugin-image` (Gatsby), `@astrojs/image` (Astro) may handle image optimization automatically
+2. **Check wrapper components** — a custom `<OptimizedImage>` component may add `width`/`height`/`lazy`/`alt` internally
+3. **Check build plugins** — Webpack/Vite plugins in the config may handle optimization (e.g., `imagemin-webpack-plugin`, `vite-plugin-imagemin`)
+4. **Check for CDN/external optimization** — if `next.config.js` has `images.loader` or `images.remotePatterns`, images may be optimized externally
+5. **If a provider is found** — read it to confirm it provides the feature before clearing the finding
+
+Only flag "missing optimization" if confirmed that no component, library, or config handles it.
+
+## Applicability Checks
+
+Before reporting a "missing X" issue, verify the feature is relevant:
+
+| Check | Only flag if... |
+|-------|----------------|
+| Missing `fetchpriority="high"` | An above-the-fold hero/header image is confirmed to exist |
+| Missing code splitting | The project has multiple routes/pages (not a single-page utility) |
+| Missing skeleton/loading states | Client-side data fetching is used for visible content |
+| No bundle analyzer | The project has a build step and uses JS bundling |
+| CSS animation CLS risk | The animation runs automatically on page load (not user-triggered) |
+| Missing `loading="lazy"` | The image is confirmed below-the-fold (not hero/header) |
+
+If the feature is not applicable, omit the finding entirely.
 
 ## Analysis Protocol
 
@@ -153,6 +208,9 @@ grep: "web-vitals|@next/bundle-analyzer|lighthouse|crux-api" package.json
 **CSS Animation Concerns**
 - `grep "animation:|@keyframes" styles/**/*.css app/**/*.css`
 - `grep "transition:" styles/**/*.css app/**/*.css`
+- `grep "animate-|transition-" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}` — Tailwind animation utilities
+- `grep "keyframes|animation:" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}` — CSS-in-JS animations (styled-components, Emotion, etc.)
+- `grep "animation|keyframes" tailwind.config.{js,ts,mjs}` — custom Tailwind animations
 - Flag animations using `top`, `left`, `width`, `height` (trigger layout)
 - Prefer `transform` and `opacity` animations
 - **IMPORTANT: Only flag transitions/animations that affect CLS** — this means transitions that run automatically during page load (e.g., entrance animations, auto-playing carousels, content that animates in on mount). User-triggered transitions (hover effects, click-to-expand, scroll-triggered with `IntersectionObserver`) do NOT cause CLS because CLS excludes layout shifts within 500ms of user input. Before flagging a CSS transition, verify:
@@ -160,6 +218,11 @@ grep: "web-vitals|@next/bundle-analyzer|lighthouse|crux-api" package.json
   2. The transition runs without user interaction (auto-play, `animation` with no trigger, `onMount`)
   3. The animated property actually causes layout shift (changes element size or position in the flow)
   - If you cannot confirm all three, do NOT flag it as a CLS issue. It may still be a performance concern (layout thrashing) but classify it as INP risk, not CLS.
+
+**Content Visibility**
+- `grep "content-visibility" styles/**/*.css app/**/*.css tailwind.config.{js,ts}`
+- Note as a positive signal if used on below-fold content
+- If the project has long pages with heavy below-fold content and does not use `content-visibility: auto`, note as LOW opportunity for rendering performance improvement
 
 ### Step 5: Bundle Size Analysis
 
@@ -241,3 +304,36 @@ For each category, provide:
 Include the CWV Risk Assessment table.
 
 End with a brief summary of the highest-impact optimizations, ordered by expected CWV improvement.
+
+### Machine-Readable JSON Block
+
+After the markdown report, you MUST include a machine-readable JSON summary inside a fenced code block tagged `agent-output`. The orchestrator extracts scores and issues from this JSON — not from parsing markdown. See `output-schema.md` for the full schema.
+
+Your JSON block must include two categories: `"Performance"` and `"Image Optimization"`, plus the `cwvRisk` object. Each category needs `name`, `score`, `issueCount`, and `issues` array. Every issue must have all required fields: `id`, `severity`, `category`, `title`, `location`, `problem`, `impact`, `fix`, `fixability`, `effort`, `confidence`.
+
+Example:
+````
+```agent-output
+{
+  "categories": [
+    {
+      "name": "Performance",
+      "score": 78,
+      "issueCount": { "critical": 0, "high": 1, "medium": 3, "low": 1 },
+      "issues": [ ... ]
+    },
+    {
+      "name": "Image Optimization",
+      "score": 70,
+      "issueCount": { "critical": 0, "high": 2, "medium": 2, "low": 0 },
+      "issues": [ ... ]
+    }
+  ],
+  "cwvRisk": {
+    "lcp": { "level": "MEDIUM", "factors": ["Hero image missing priority"] },
+    "inp": { "level": "LOW", "factors": ["Lightweight handlers"] },
+    "cls": { "level": "HIGH", "factors": ["Images missing dimensions"] }
+  }
+}
+```
+````

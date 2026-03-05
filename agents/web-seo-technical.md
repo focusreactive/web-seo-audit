@@ -31,7 +31,7 @@ The orchestrator provides these reference files in your agent prompt:
 - Must include "CMS content issue" in the problem description so users know where to fix them
 - The exception is when the template lacks a fallback for missing CMS data — that IS a code issue (e.g., no default title when CMS title is empty)
 
-**Boundary — Image Optimization**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema).
+**Boundary — Image Optimization**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema). **OG image dimensions**: When checking `og:image`, verify the image URL is valid and absolute. If the metadata API specifies `openGraph.images` with `width` and `height` properties, validate they meet the 1200x630 minimum — this check belongs here (Meta & Structured Data), not in Image Optimization.
 
 **Boundary — AI Search Readiness (AEO)**: The following areas are owned by `web-seo-aeo` and must NOT be scored here:
 - **robots.txt**: AI bot rules (GPTBot, ChatGPT-User, Google-Extended, PerplexityBot, ClaudeBot, CCBot, Bytespider, Applebot-Extended) and training vs retrieval bot distinction → AEO. You own: robots.txt existence, general `Disallow` rules, and sitemap reference.
@@ -59,11 +59,61 @@ The orchestrator provides the detected framework. When the framework is **Eleven
 
 **Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
 
+## Verification Protocol
+
+After detecting a potential issue via grep, you MUST verify it before reporting:
+
+1. **Read the file** — read at least ±10 lines around the grep match to confirm the issue exists in context
+2. **Check surrounding code** — the flagged pattern may be handled on the next line, in a ternary, or via a variable (e.g., `alt` attribute on a separate line from `<img`)
+3. **Check for comments/disabled code** — do not flag patterns inside comments, JSX comments, or `if (false)` blocks
+4. **Exclude test/mock files** — apply the file exclusion patterns provided by the orchestrator
+5. **Assign confidence** — HIGH if you read the file and traced imports, MEDIUM if you read match context only, LOW if grep-only
+
+Never report an issue based solely on a grep match without reading the surrounding context.
+
+## Import & Dependency Tracing
+
+Before reporting a "missing X" issue (missing metadata, missing structured data, missing robots.txt, etc.):
+
+1. **Check imports** — does the page import a component that might provide the missing feature? Search for common SEO component patterns: `SEO`, `Meta`, `Head`, `Schema`, `JsonLd`, `Metadata`
+2. **Check layouts** — in App Router, layouts provide metadata via `export const metadata` or `generateMetadata`. A page without metadata may inherit it from a parent layout.
+3. **Check package.json** — libraries like `next-seo`, `next-sitemap`, `react-helmet-async`, `@unhead/vue`, `gatsby-plugin-react-helmet` auto-inject SEO features
+4. **Check framework config** — plugins/middleware in `next.config.js`, `nuxt.config.ts`, `gatsby-config.js` may handle the feature
+5. **If a provider is found** — read it to confirm it actually provides the feature before clearing the finding
+
+Only flag "missing X" if you've confirmed the feature is not provided by any parent layout, imported component, library, or config.
+
+## Applicability Checks
+
+Before reporting a "missing X" issue, verify the feature is relevant to this project:
+
+| Check | Only flag if... |
+|-------|----------------|
+| Missing pagination markup | Paginated content patterns are detected (e.g., `/page/2`, `?page=`, pagination components) |
+| Missing About page | The site appears to be a business/organization site (not a personal dev tool or utility) |
+| Missing Privacy Policy | The site is commercial or collects user data |
+| Missing author info | The site has blog/article/editorial content |
+| Multiple H1 elements | Confirmed on a single rendered page (not across different page files) |
+| Duplicate titles | Compare only leaf page metadata, not layout/template defaults |
+| Missing hreflang | Multi-language content is detected |
+| Missing 500 error page | Framework is server-rendered (not SSG/static) |
+
+If the feature is not applicable, omit the finding entirely — do not report it as LOW.
+
 ## Analysis Protocol
 
 ### Step 1: Project Discovery
 
-Use the framework information provided by the orchestrator. Additionally, check for SEO-specific configuration:
+Use the framework information provided by the orchestrator. Additionally, check for SEO-specific configuration and project characteristics:
+
+**Multi-tenant Detection**
+```
+grep "subdomain|tenant|hostname|getHost|req.headers.host" app/**/*.{tsx,jsx,ts,js} middleware.{ts,js} lib/**/*.{ts,js}
+grep "NEXT_PUBLIC_SITE_URL|BASE_URL|SITE_DOMAIN" app/**/*.{tsx,jsx,ts,js} .env.example
+```
+If multi-tenant patterns detected, note in report header: "Multi-tenant site detected — metadata and canonical URL checks evaluate template correctness, not per-tenant content." Adjust duplicate title/description checks: templates that parameterize titles from tenant data are NOT duplicates, even if the template string is the same.
+
+**SEO-specific configuration**:
 
 ```
 # Check for existing SEO configuration
@@ -93,13 +143,21 @@ Run these checks in order:
 **Sitemap**
 - `glob: public/sitemap*.xml` or `glob: app/sitemap.{ts,js}`
 - Verify it exists
+- For static XML sitemaps (`public/sitemap.xml`): READ the file and validate:
+  - All `<loc>` URLs are absolute (start with `https://`)
+  - No localhost or placeholder URLs
+  - `<lastmod>` dates (if present) are valid ISO 8601
+  - Count URLs and compare against discovered page routes — flag significant gaps (>30% of routes missing from sitemap) as MEDIUM
+- For dynamic sitemaps (`app/sitemap.ts`): read the file and verify it queries all content sources
 - For dynamic sites, check if sitemap includes dynamic routes
 - Check for `next-sitemap` in package.json dependencies
 
 **Meta Robots**
 - `grep "noindex|nofollow" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- `grep "robots.*index.*false|robots.*follow.*false|robots.*noindex|robots.*nofollow" app/**/*.{tsx,jsx,ts,js}`
+- Check metadata API exports for `robots` property with restrictive settings (e.g., `export const metadata = { robots: { index: false } }`)
 - Flag any unintentional `noindex` directives
-- Check for `noindex` in metadata API exports
+- Check for `noindex` in both JSX meta tags and metadata API exports
 
 **Canonical URLs**
 - `grep "canonical" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
@@ -283,6 +341,9 @@ Detect pages that may have zero or minimal server-rendered content:
 
 ### Step 11: Internationalization (if applicable)
 
+- `grep "next-intl|next-i18next|react-intl|i18next|@formatjs|vue-i18n|@nuxtjs/i18n" package.json`
+- `glob: app/[locale]/**/page.{tsx,jsx,ts,js}` or `glob: app/[lang]/**/page.{tsx,jsx,ts,js}`
+- `grep "middleware.*locale|i18n.*routing|locales" middleware.{ts,js}`
 - `grep "hreflang|i18n|locale" app/**/*.{tsx,jsx} next.config.{js,mjs,ts}`
 - Check for `lang` attribute on `<html>`
 - Verify hreflang tags if multiple languages exist
@@ -318,6 +379,50 @@ Check for Experience, Expertise, Authoritativeness, and Trustworthiness signals 
 
 **Boundary Note**: E-E-A-T structured data properties (`sameAs`, `about`, `reviewedBy`) are owned by `web-seo-aeo`. Only check for the presence of author attribution, trust pages, and contact information here.
 
+### Step 13: Accessibility-SEO Overlap Checks
+
+Check for accessibility patterns that directly affect SEO or CWV:
+
+**Skip Navigation**
+- `grep "skip.*nav|skip.*content|skiplink|SkipLink" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Flag missing skip navigation link on sites with complex navigation (LOW)
+
+**Form Labels**
+- `grep "<input|<textarea|<select" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Verify inputs have associated `<label>` elements or `aria-label` (MEDIUM if forms exist without labels — affects usability and search engine form understanding)
+
+**ARIA Landmarks vs HTML5 Landmarks**
+- If `<div role="main">` is used instead of `<main>`, note as LOW — prefer native semantic elements
+
+### Step 14: Content Quality Signals
+
+Static code analysis can detect certain content quality red flags. These are LOW/MEDIUM signals — not definitive content judgments.
+
+**Thin content detection**:
+- Pages with very little static text content (JSX that renders only dynamic data with no static headings, descriptions, or explanatory text)
+- Pages that are pure wrappers around a single component with no SEO-relevant content of their own
+- Flag as LOW: "Page has minimal static content — search engines may view this as thin content"
+- Do NOT flag pages that clearly load content dynamically via SSR (server components with async data fetching)
+
+**Duplicate title/description patterns**:
+- `grep "title:" app/**/page.{tsx,jsx}` — collect all static title strings
+- If multiple pages share the exact same title string: flag as MEDIUM ("N pages share identical title: '{title}'")
+- If titles are template-based (e.g., `${product.name} | Store`) this is acceptable — only flag truly hardcoded duplicates
+
+**Heading structure per page**:
+- Check that each page file (or its layout) produces a logical heading hierarchy
+- Multiple H1 tags in the same page component tree: flag as MEDIUM
+- H3 without a preceding H2: flag as LOW (heading level skip)
+
+### Step 15: Site Search & OpenSearch
+
+**OpenSearch Detection**
+- `grep "opensearchdescription|application/opensearchdescription" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} public/**/*.xml`
+- If the site has a search feature (detect: `grep "search|Search" app/**/page.{tsx,jsx} components/**/Search*.{tsx,jsx}`), check for:
+  - OpenSearch description XML file
+  - WebSite schema with `SearchAction` in JSON-LD (cross-reference with structured data findings)
+- Flag missing SearchAction in WebSite schema when search functionality exists (LOW)
+
 ## Output Format
 
 Return findings as a structured list of issues following the quality-gates format provided by the orchestrator in your agent prompt.
@@ -334,3 +439,31 @@ For each category, provide:
 - Individual issues in the standard format
 
 End with a brief summary of the most critical findings and recommended priority order for fixes.
+
+### Machine-Readable JSON Block
+
+After the markdown report, you MUST include a machine-readable JSON summary inside a fenced code block tagged `agent-output`. The orchestrator extracts scores and issues from this JSON — not from parsing markdown. See `output-schema.md` for the full schema.
+
+Your JSON block must include two categories: `"Technical SEO"` and `"Meta & Structured Data"`. Each category needs `name`, `score`, `issueCount`, and `issues` array. Every issue must have all required fields: `id`, `severity`, `category`, `title`, `location`, `problem`, `impact`, `fix`, `fixability`, `effort`, `confidence`.
+
+Example:
+````
+```agent-output
+{
+  "categories": [
+    {
+      "name": "Technical SEO",
+      "score": 85,
+      "issueCount": { "critical": 0, "high": 1, "medium": 2, "low": 1 },
+      "issues": [ ... ]
+    },
+    {
+      "name": "Meta & Structured Data",
+      "score": 92,
+      "issueCount": { "critical": 0, "high": 0, "medium": 2, "low": 1 },
+      "issues": [ ... ]
+    }
+  ]
+}
+```
+````
