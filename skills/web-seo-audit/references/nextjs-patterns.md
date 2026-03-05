@@ -2,7 +2,9 @@
 
 ## Overview
 
-This reference covers SEO-related patterns for both Next.js App Router and Pages Router. Each pattern includes detection rules (grep/glob patterns), correct implementation, and common anti-patterns.
+This reference covers SEO-related patterns for both Next.js App Router and Pages Router. Each pattern includes detection rules (grep/glob patterns), correct implementation, common anti-patterns, and **version gates** indicating the minimum Next.js version required.
+
+**Version gate notation**: `[v13.2+]` means the check only applies to Next.js >= 13.2. `[any]` means all versions. Checks without a version gate apply to all versions.
 
 ## Router Detection
 
@@ -27,9 +29,11 @@ Both routers can coexist. Check for both and report which is primary.
 
 ---
 
-## App Router Patterns
+## App Router Patterns [v13+]
 
-### Metadata API
+Skip this entire section if the project does not use App Router.
+
+### Metadata API [v13.2+]
 
 **Detection**: `grep "export.*metadata|generateMetadata" app/**/page.{tsx,jsx,ts,js} app/**/layout.{tsx,jsx,ts,js}`
 
@@ -84,7 +88,7 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 
 **Detection for anti-pattern**: `grep "next/head" app/**/*.{tsx,jsx}`
 
-### Server Components vs Client Components
+### Server Components vs Client Components [v13+]
 
 **Detection**: `grep "'use client'" app/**/*.{tsx,jsx}`
 
@@ -101,7 +105,7 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 
 **Detection**: `grep -l "'use client'" app/**/page.{tsx,jsx} app/**/layout.{tsx,jsx}`
 
-### generateStaticParams
+### generateStaticParams [v13+]
 
 **Detection**: `grep "generateStaticParams" app/**/*.{tsx,jsx,ts,js}`
 
@@ -118,7 +122,7 @@ export async function generateStaticParams() {
 - Dynamic routes without `generateStaticParams` (causes SSR on every request)
 - Missing `dynamicParams = false` when all params are known at build time
 
-### next/image
+### next/image [any]
 
 **Detection**: `grep "next/image|<img " app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
@@ -147,7 +151,7 @@ import Image from 'next/image';
 
 **Detection**: `grep "<img " app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
-### next/link
+### next/link [any]
 
 **Detection**: `grep "<a href|next/link" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
@@ -164,7 +168,7 @@ import Link from 'next/link';
 
 **Detection**: `grep "<a href=\"/" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
-### next/font
+### next/font [v13+]
 
 **Detection**: `grep "next/font" app/**/*.{tsx,jsx,ts,js}`
 
@@ -191,7 +195,7 @@ export default function RootLayout({ children }) {
 
 **Detection**: `grep "fonts.googleapis.com|fonts.gstatic.com" app/**/*.{tsx,jsx} public/**/*.html styles/**/*.css`
 
-### next/script
+### next/script [any]
 
 **Detection**: `grep "next/script|<script" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
@@ -218,7 +222,7 @@ import Script from 'next/script';
 
 **Detection**: `grep "<script" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
 
-### Route Configuration
+### Route Configuration [v13+]
 
 **Detection**: `grep "export const dynamic|export const revalidate|export const runtime" app/**/*.{tsx,jsx,ts,js}`
 
@@ -235,7 +239,7 @@ export const dynamic = 'force-static'; // Force static even with dynamic functio
 - No `revalidate` on content that changes periodically
 - Using `dynamic = 'force-dynamic'` as a fix for build errors instead of fixing the root cause
 
-### robots.ts and sitemap.ts
+### robots.ts and sitemap.ts [v13+]
 
 **Detection**: `glob app/robots.{ts,js} app/sitemap.{ts,js,xml}`
 
@@ -280,7 +284,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 - No sitemap at all
 - Sitemap missing dynamic pages
 
-### OG Image Generation
+### OG Image Generation [v13.3+]
 
 **Detection**: `glob app/**/opengraph-image.{tsx,jsx,ts,js} app/**/twitter-image.{tsx,jsx,ts,js}`
 
@@ -303,7 +307,7 @@ export default async function Image({ params }) {
 }
 ```
 
-### Streaming and Suspense
+### Streaming and Suspense [v13+]
 
 **Detection**: `grep "Suspense|loading.tsx" app/**/*.{tsx,jsx}`
 
@@ -326,11 +330,50 @@ export default function Page() {
 
 **SEO benefit**: Above-the-fold content renders immediately, improving LCP while still allowing dynamic content below.
 
+### Fetch Cache Defaults [v15+]
+
+Next.js 15 changed the default fetch caching behavior: `fetch()` now defaults to `no-store` (no caching) instead of `force-cache`. This means:
+
+**Detection**: Check Next.js version >= 15 and look for `fetch()` calls without explicit cache options.
+
+```
+grep "fetch(" app/**/*.{tsx,jsx,ts,js}
+# Flag fetch calls without next: { revalidate } or cache: option
+```
+
+**Rules**:
+- In v15+, every `fetch()` in Server Components should have an explicit cache strategy
+- `fetch(url)` without options = `no-store` (fetches on every request)
+- If the previous behavior was desired, add `cache: 'force-cache'` or `next: { revalidate: N }`
+- This is MEDIUM priority — awareness check, not necessarily a bug
+
+**Correct (v15)**:
+```tsx
+// Explicit caching — clear intent
+const data = await fetch('https://api.example.com/data', {
+  next: { revalidate: 3600 }
+});
+```
+
+### Partial Prerendering [v14+, experimental]
+
+PPR allows mixing static and dynamic content in a single route. Detection:
+
+```
+grep "experimental.*ppr" next.config.{js,mjs,ts}
+```
+
+**Rules**:
+- If PPR is enabled, check that `<Suspense>` boundaries properly separate static shell from dynamic content
+- LOW priority — informational, not a common issue yet
+
 ---
 
-## Pages Router Patterns
+## Pages Router Patterns [any]
 
-### next/head
+Skip this entire section if the project does not use Pages Router.
+
+### next/head [any]
 
 **Detection**: `grep "next/head" pages/**/*.{tsx,jsx}`
 
@@ -359,7 +402,7 @@ export default function Page() {
 - Duplicate `<Head>` entries across components causing tag duplication
 - Using `<head>` (lowercase) instead of `next/head`
 
-### Data Fetching (Pages Router)
+### Data Fetching (Pages Router) [any]
 
 **Detection**: `grep "getStaticProps|getServerSideProps|getStaticPaths" pages/**/*.{tsx,jsx,ts,js}`
 
@@ -375,7 +418,7 @@ export default function Page() {
 - Client-side data fetching for content that should be SSR/SSG (harms SEO)
 - `fallback: false` when new content is added regularly (should be `'blocking'`)
 
-### _document.tsx
+### _document.tsx [any]
 
 **Detection**: `glob pages/_document.{tsx,jsx,ts,js}`
 
@@ -405,7 +448,7 @@ export default function Document() {
 - Page-specific meta tags in `_document` (should be in individual pages)
 - Missing `_document.tsx` entirely (no `lang` attribute)
 
-### _app.tsx
+### _app.tsx [any]
 
 **Detection**: `glob pages/_app.{tsx,jsx,ts,js}`
 
@@ -465,7 +508,7 @@ When analyzing code, flag patterns that would throw during SSR:
 
 These are Next.js-specific performance antipatterns that hurt runtime performance, inflate bundles, or cause unnecessary re-renders. General CWV patterns are covered by `web-seo-performance`; these are framework-specific issues only.
 
-### Excessive `'use client'` Boundaries (App Router)
+### Excessive `'use client'` Boundaries (App Router) [v13+]
 
 **Detection**:
 ```
@@ -511,7 +554,7 @@ export default function Page() {
 }
 ```
 
-### Layout-Level Fetch Without Caching (App Router)
+### Layout-Level Fetch Without Caching (App Router) [v13+]
 
 **Detection**:
 ```
@@ -543,7 +586,7 @@ async function getSettings() {
 }
 ```
 
-### Barrel File Re-exports (App Router)
+### Barrel File Re-exports (App Router) [v13+]
 
 **Detection**:
 ```
@@ -575,7 +618,7 @@ export * from './HeavyChart'; // Even unused, this gets bundled
 import { Button } from '@/components'; // ❌ Triggers barrel file
 ```
 
-### Client Component Wrapping Server Components (App Router)
+### Client Component Wrapping Server Components (App Router) [v13+]
 
 **Detection**:
 ```
@@ -621,7 +664,7 @@ export function PageWrapper({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### Heavy Imports in `_app.tsx` (Pages Router)
+### Heavy Imports in `_app.tsx` (Pages Router) [any]
 
 **Detection**:
 ```
@@ -652,7 +695,7 @@ import _ from 'lodash'; // ❌ 70KB+ included on every page
 import { ThemeProvider } from '@mui/material'; // ❌ Pulls in entire MUI
 ```
 
-### `getServerSideProps` Overuse (Pages Router)
+### `getServerSideProps` Overuse (Pages Router) [any]
 
 **Detection**:
 ```
@@ -689,7 +732,7 @@ export async function getServerSideProps({ params }) { // ❌ SSR on every reque
 }
 ```
 
-### Excessive Dynamic Imports (Both Routers)
+### Excessive Dynamic Imports (Both Routers) [any]
 
 **Detection**:
 ```
@@ -699,7 +742,7 @@ grep: "dynamic\(|React\.lazy\(" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} componen
 **Rules**:
 - \>10 `dynamic()` / `React.lazy()` calls project-wide = MEDIUM — excessive code splitting creates too many network requests, increasing load time instead of reducing it
 
-### Dynamic Imports for Above-the-Fold Components (Both Routers)
+### Dynamic Imports for Above-the-Fold Components (Both Routers) [any]
 
 **Detection**:
 ```
@@ -731,7 +774,7 @@ export default function Page() {
 }
 ```
 
-### Too Many Nested Context Providers (Both Routers)
+### Too Many Nested Context Providers (Both Routers) [any]
 
 **Detection**:
 ```
@@ -783,7 +826,7 @@ export default function RootLayout({ children }) {
 }
 ```
 
-### Large Inline JSON in Pages (Both Routers)
+### Large Inline JSON in Pages (Both Routers) [any]
 
 **Detection**:
 ```
@@ -814,7 +857,7 @@ const countries = [ // ❌ 200+ items inline in the page component
 ];
 ```
 
-### Missing React.memo on Context Consumers (Both Routers)
+### Missing React.memo on Context Consumers (Both Routers) [any]
 
 **Detection**:
 ```
@@ -827,7 +870,7 @@ grep: "React.memo|memo(" components/**/*.{tsx,jsx}
 **Rules**:
 - Expensive components (with heavy render logic or many children) that consume context via `useContext` without `React.memo` = LOW — they re-render on every context change even if the consumed value hasn't changed
 
-### Importing Entire Icon Libraries (Both Routers)
+### Importing Entire Icon Libraries (Both Routers) [any]
 
 **Detection**:
 ```

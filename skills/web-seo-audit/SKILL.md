@@ -10,12 +10,14 @@ You are a Technical SEO Lead orchestrating a comprehensive audit of a web projec
 
 ## Framework Detection Protocol
 
-Before running any analysis, detect the project framework and structure:
+Before running any analysis, detect the project framework, version, and structure. This determines which checks to run — agents only receive checks relevant to the detected framework and version.
+
+### Step 1: Detect Framework
 
 ```
-# 1. Read package.json and check dependencies/devDependencies for known frameworks
-#    IMPORTANT: Check each framework individually to avoid false positives.
-#    Match the exact dependency key (e.g., "next":) not substrings.
+# Read package.json and check dependencies/devDependencies for known frameworks
+# IMPORTANT: Check each framework individually to avoid false positives.
+# Match the exact dependency key (e.g., "next":) not substrings.
 grep: "\"next\":" package.json
 grep: "\"react\":" package.json
 grep: "\"vue\":" package.json
@@ -24,36 +26,67 @@ grep: "\"gatsby\":" package.json
 grep: "\"astro\":" package.json
 grep: "\"svelte\":" package.json
 grep: "\"@angular/core\":" package.json
-
-# 2. If Next.js detected, get version and router type
-grep: "\"next\": \"" package.json
-
-# 3. Detect router type via file structure
-glob: app/**/page.{tsx,jsx,ts,js}     → App Router
-glob: pages/**/*.{tsx,jsx,ts,js}       → Pages Router
-
-# 4. Identify project structure
-glob: src/**/*.{tsx,jsx,ts,js}
-glob: app/**/*.{tsx,jsx,ts,js}
-glob: pages/**/*.{tsx,jsx,ts,js}
-glob: public/**/*
 ```
 
 **Framework priority resolution** (when multiple detected, use this order):
-1. `next` (most specific checks) — if `"next":` found in dependencies
+1. `next` — if `"next":` found in dependencies
 2. `nuxt` — if `"nuxt":` found
 3. `gatsby` — if `"gatsby":` found
 4. `astro` — if `"astro":` found
 5. `vue` / `svelte` / `angular` / `react` — generic SPA checks
 6. `other` — no framework dependencies found, treat as static HTML
 
-Record the detection result:
-- `framework`: next | nuxt | gatsby | astro | react | vue | svelte | angular | other
-- `isNextJs`: true | false
-- `nextjsRouter`: app | pages | both | n/a
-- `nextjsVersion`: version string or n/a
+### Step 2: Detect Version
 
-This determines which agents to spawn and which weight distribution to use.
+Extract the framework version from package.json. This gates which checks are applicable.
+
+```
+# Extract version string for the detected framework
+grep: "\"next\": \"" package.json       → e.g., "14.2.3"
+grep: "\"nuxt\": \"" package.json       → e.g., "3.8.0"
+grep: "\"gatsby\": \"" package.json     → e.g., "5.12.0"
+grep: "\"astro\": \"" package.json      → e.g., "4.1.0"
+
+# Parse major.minor from version string (strip ^, ~, >= prefixes)
+# Examples: "^14.2.3" → 14.2, "~3.8.0" → 3.8, ">=5.0.0" → 5.0
+```
+
+### Step 3: Detect Router Type (Next.js only)
+
+```
+glob: app/**/page.{tsx,jsx,ts,js}     → App Router
+glob: pages/**/*.{tsx,jsx,ts,js}       → Pages Router
+# Both can coexist — check for both
+```
+
+### Step 4: Identify Project Structure
+
+```
+glob: src/**/*.{tsx,jsx,ts,js}
+glob: app/**/*.{tsx,jsx,ts,js}
+glob: pages/**/*.{tsx,jsx,ts,js}
+glob: public/**/*
+```
+
+### Detection Result
+
+Record all of these — they drive check selection:
+- `framework`: next | nuxt | gatsby | astro | react | vue | svelte | angular | other
+- `frameworkVersion`: parsed major.minor (e.g., 14.2) or n/a
+- `router`: app | pages | both | n/a (Next.js only)
+- `sourceRoot`: path prefix (see Source Root Detection)
+
+### Step 5: Select Applicable Checks
+
+After detection, consult `references/framework-checks.md` to build the check list for each agent:
+
+1. Start with **universal checks** for each agent
+2. Add **framework-specific checks** for the detected framework
+3. **Filter by version** — only include checks where `frameworkVersion >= minimum version`
+4. **Filter by router** — for Next.js, only include App Router checks if App Router detected (and vice versa); include both if both routers detected
+5. Pass the filtered check list to each agent's prompt
+
+This ensures agents never run irrelevant checks (e.g., no `next/image` checks for Vue projects, no App Router checks for Next.js 12 projects).
 
 ## Source Root Detection
 
@@ -93,46 +126,83 @@ Each agent is spawned with a prompt built from a named template. Templates follo
 ### Template: technical
 
 ```
-Analyze technical SEO and meta/structured data: crawlability, indexability, URL structure, security, internal linking, title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD structured data. Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Schema-types reference]: {{schemaTypesContent}}.
+Analyze technical SEO and meta/structured data. Framework: {{framework}} {{frameworkVersion}}. Router: {{router}}. Source root: {{sourceRoot}}.
+
+Run ONLY these checks (filtered for this framework and version):
+{{technicalChecks}}
+
+[Quality-gates]: {{qualityGatesSummary}}. [Schema-types reference]: {{schemaTypesContent}}.
 ```
 
 ### Template: performance
 
 ```
-Analyze performance and image optimization: LCP, INP, CLS patterns, bundle size, font loading, third-party scripts, image format, sizing, lazy loading, alt attributes, responsive images. Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [CWV reference]: {{cwvContent}}.
+Analyze performance and image optimization. Framework: {{framework}} {{frameworkVersion}}. Router: {{router}}. Source root: {{sourceRoot}}.
+
+Run ONLY these checks (filtered for this framework and version):
+{{performanceChecks}}
+
+[Quality-gates]: {{qualityGatesSummary}}. [CWV reference]: {{cwvContent}}.
 ```
 
-### Template: nextjs
+### Template: framework
+
+Replaces the old `nextjs` template. Used for any framework that has a dedicated agent (Next.js, Nuxt, Gatsby, Astro). NOT spawned for plain SPAs or static HTML.
 
 ```
-Analyze Next.js patterns: metadata API, Server/Client Components, data fetching, generateStaticParams, next/image, next/link, next/font, next/script, route configuration, robots.ts, sitemap.ts, OG image generation, Streaming & Suspense, and performance antipatterns (excessive client boundaries, layout fetch caching, barrel files, dynamic import misuse, provider nesting, heavy _app imports, icon library imports, inline JSON, React.memo, getServerSideProps overuse). Router: {{nextjsRouter}}. Version: {{nextjsVersion}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Next.js patterns reference]: {{nextjsPatternsContent}}.
+Analyze {{framework}}-specific patterns. Version: {{frameworkVersion}}. Router: {{router}}. Source root: {{sourceRoot}}.
+
+Run ONLY these checks (filtered for version {{frameworkVersion}}):
+{{frameworkChecks}}
+
+[Quality-gates]: {{qualityGatesSummary}}. [Framework patterns reference]: {{frameworkPatternsContent}}.
 ```
+
+**Framework patterns reference** is loaded based on detected framework:
+- Next.js → `references/nextjs-patterns.md`
+- Nuxt → (future: `references/nuxt-patterns.md`)
+- Gatsby → (future: `references/gatsby-patterns.md`)
+- Astro → (future: `references/astro-patterns.md`)
+
+If no dedicated patterns reference exists for the framework, include the relevant checks from `references/framework-checks.md` inline in the prompt.
 
 ### Template: aeo
 
 ```
-Analyze AI search readiness: llms.txt, AI crawler management (8 bots — training vs retrieval), entity-optimized structured data (sameAs, about, dateModified, mainEntityOfPage, speakable, @id), content structure for AI extraction (landmarks, question headings), AI crawlability signals. Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [AEO patterns reference]: {{aeoContent}}.
+Analyze AI search readiness. Framework: {{framework}} {{frameworkVersion}}. Source root: {{sourceRoot}}.
+
+Run ONLY these checks (all AEO checks are universal, but use framework-specific file paths):
+{{aeoChecks}}
+
+Framework-specific file paths for detection:
+{{aeoFilePaths}}
+
+[Quality-gates]: {{qualityGatesSummary}}. [AEO patterns reference]: {{aeoContent}}.
 ```
 
 ### Template: fix
 
 ```
-Run iterative fix cycle: audit the project, classify issues by fixability, apply safe fixes, re-audit, repeat until target score ({{targetScore}}) or max iterations ({{maxIterations}}). Framework: {{framework}}{{version}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Fix-classification reference]: {{fixClassificationContent}}.
+Run iterative fix cycle: audit the project, classify issues by fixability, apply safe fixes, re-audit, repeat until target score ({{targetScore}}) or max iterations ({{maxIterations}}). Framework: {{framework}} {{frameworkVersion}}. Router: {{router}}. Source root: {{sourceRoot}}. [Quality-gates]: {{qualityGatesSummary}}. [Fix-classification reference]: {{fixClassificationContent}}.
 ```
 
 ### Variable Reference
 
 | Variable | Source | Description |
 |----------|--------|-------------|
-| `{{framework}}` | Framework Detection | Detected framework name (e.g., `next`, `react`, `vue`) |
-| `{{version}}` | Framework Detection | Framework version string (e.g., ` 14.2.3`), empty if not applicable |
+| `{{framework}}` | Framework Detection | Detected framework name (e.g., `next`, `react`, `vue`, `nuxt`, `astro`, `gatsby`, `other`) |
+| `{{frameworkVersion}}` | Framework Detection | Parsed major.minor version (e.g., `14.2`), `n/a` if not applicable |
+| `{{router}}` | Framework Detection | `app`, `pages`, `both`, or `n/a` — Next.js only |
 | `{{sourceRoot}}` | Source Root Detection | Path prefix for source files (e.g., `src/`, or empty) |
-| `{{nextjsRouter}}` | Framework Detection | `app`, `pages`, or `both` — Next.js only |
-| `{{nextjsVersion}}` | Framework Detection | Next.js version string — Next.js only |
+| `{{technicalChecks}}` | `references/framework-checks.md` | Universal + framework-specific technical checks, filtered by version and router |
+| `{{performanceChecks}}` | `references/framework-checks.md` | Universal + framework-specific performance checks, filtered by version and router |
+| `{{frameworkChecks}}` | `references/framework-checks.md` | Deep framework-specific checks, filtered by version and router |
+| `{{aeoChecks}}` | `references/framework-checks.md` | Universal AEO checks (all apply regardless of framework) |
+| `{{aeoFilePaths}}` | `references/framework-checks.md` | Framework-specific file paths for AEO detection patterns |
 | `{{qualityGatesSummary}}` | `references/quality-gates.md` | Summary of scoring rules (deduction values, caps, output format) |
 | `{{schemaTypesContent}}` | `references/schema-types.md` | Full content of schema-types reference |
 | `{{cwvContent}}` | `references/cwv-thresholds.md` | Full content of CWV thresholds reference |
-| `{{nextjsPatternsContent}}` | `references/nextjs-patterns.md` | Full content of Next.js patterns reference |
+| `{{frameworkPatternsContent}}` | Framework-specific reference file | Next.js → `nextjs-patterns.md`, etc. Loaded only for frameworks with dedicated reference files |
 | `{{aeoContent}}` | `references/aeo-patterns.md` | Full content of AEO patterns reference |
 | `{{fixClassificationContent}}` | `references/fix-classification.md` | Full content of fix classification reference |
 | `{{targetScore}}` | User argument or default | Target score for fix cycle (default: 80) |
@@ -206,27 +276,34 @@ Runs a comprehensive audit across all categories. This is the default command. W
 
 **Steps**:
 
-1. Run framework detection (above)
+1. Run framework detection (Steps 1-4 above: framework, version, router, project structure)
 2. Run source root detection (see Source Root Detection below)
-3. Load reference files by reading them from the `references/` directory relative to this skill file:
+3. Select applicable checks by consulting `references/framework-checks.md`:
+   - For each agent, collect universal checks + framework-specific checks
+   - Filter by `frameworkVersion` (only include checks where project version >= minimum)
+   - Filter by `router` (for Next.js: App vs Pages vs both)
+   - This produces `{{technicalChecks}}`, `{{performanceChecks}}`, `{{frameworkChecks}}`, `{{aeoChecks}}`, `{{aeoFilePaths}}`
+4. Load reference files by reading them from the `references/` directory relative to this skill file:
    - Read `references/quality-gates.md` for scoring rules
    - Read `references/cwv-thresholds.md` for CWV reference
-   - If Next.js: Read `references/nextjs-patterns.md`
    - Read `references/schema-types.md` for structured data reference
    - Read `references/aeo-patterns.md` for AI search readiness reference
-4. Spawn agents **in parallel** using the Agent tool. Build each agent's prompt from its Prompt Template (see Prompt Templates above), filling in all `{{variable}}` placeholders with detected values and loaded reference content.
+   - If framework has a dedicated patterns reference (e.g., Next.js → `references/nextjs-patterns.md`): read it
+5. Spawn agents **in parallel** using the Agent tool. Build each agent's prompt from its Prompt Template (see Prompt Templates above), filling in all `{{variable}}` placeholders with detected values, filtered check lists, and loaded reference content.
 
-   **All projects** (spawn 3):
+   **All projects** (spawn 3 universal agents):
    ```
-   Agent: web-seo-technical   — Template: technical
-   Agent: web-seo-performance  — Template: performance
-   Agent: web-seo-aeo          — Template: aeo
+   Agent: web-seo-technical   — Template: technical (with {{technicalChecks}} for this framework)
+   Agent: web-seo-performance  — Template: performance (with {{performanceChecks}} for this framework)
+   Agent: web-seo-aeo          — Template: aeo (with {{aeoChecks}} + {{aeoFilePaths}} for this framework)
    ```
 
-   **Next.js projects also spawn** (4th agent):
+   **Projects with dedicated framework support** (spawn 4th agent):
+   Only when framework is `next`, `nuxt`, `gatsby`, or `astro` (see Spawn Conditions in `references/framework-checks.md`):
    ```
-   Agent: web-seo-nextjs       — Template: nextjs
+   Agent: web-seo-framework    — Template: framework (with {{frameworkChecks}} filtered by version)
    ```
+   NOT spawned for plain React, Vue, Angular, Svelte, or static HTML projects.
 
    **If URL provided** — run these in parallel with the agents:
    - **WebFetch** the URL for HTML analysis (meta tags, structured data, images, headings, AEO signals)
@@ -374,18 +451,19 @@ Run the Next.js-specific agent for a detailed framework audit. When a URL is pro
 
 **Steps**:
 1. Verify this is a Next.js project (abort with message if not)
-2. Run framework detection and source root detection
-3. Load `references/nextjs-patterns.md` and `references/quality-gates.md`
-4. Spawn agent:
+2. Run framework detection (including version and router type) and source root detection
+3. Select applicable checks from `references/framework-checks.md`, filtered by detected Next.js version and router type
+4. Load `references/nextjs-patterns.md` and `references/quality-gates.md`
+5. Spawn agent:
    ```
-   Agent: web-seo-nextjs — Use Template: nextjs. Run a comprehensive audit covering all Next.js-specific patterns.
+   Agent: web-seo-framework — Use Template: framework. Include only version-appropriate Next.js checks.
    ```
-5. **If URL provided** — WebFetch the URL (in parallel with agent) and check:
+6. **If URL provided** — WebFetch the URL (in parallel with agent) and check:
    - Response headers: `x-powered-by`, cache-control, CDN headers
    - Rendered HTML: metadata tags rendered correctly, Server Component output vs Client Component hydration markers
    - Static vs dynamic rendering indicators
    - Correlate with code findings using the Correlation Framework
-6. Present results with Next.js Patterns score. If URL was provided, include a "Live Site Checks" section with header analysis and code ↔ live correlation.
+7. Present results with Next.js Patterns score. If URL was provided, include a "Live Site Checks" section with header analysis and code ↔ live correlation.
 
 ### `cwv [<url>]` — Core Web Vitals Focus
 
@@ -643,7 +721,7 @@ If an agent's result is incomplete or missing:
 Verify each agent's output contains its expected categories:
 - `web-seo-technical`: Must contain **Technical SEO** and **Meta & Structured Data** categories
 - `web-seo-performance`: Must contain **Performance** and **Image Optimization** categories, plus a CWV Risk Assessment table
-- `web-seo-nextjs`: Must contain **Next.js Patterns** with the router type echoed (App Router / Pages Router / Both)
+- `web-seo-framework`: Must contain **{{framework}} Patterns** (e.g., "Next.js Patterns", "Nuxt Patterns") with framework-specific context echoed (e.g., router type for Next.js)
 - `web-seo-aeo`: Must contain **AI Search Readiness** category
 
 If an agent's output does not contain its expected category names, mark those categories as Incomplete.
@@ -702,12 +780,12 @@ Use this template for the full audit report:
 |----------|-------|--------|--------|
 | Technical SEO | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | Performance | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
-| Next.js Patterns | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
+| {Framework} Patterns | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | Meta & Structured Data | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | Image Optimization | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 | AI Search Readiness | {score}/100 | {PASS/WARNING/FAIL} | {n}C {n}H {n}M {n}L |
 
-> Omit the "Next.js Patterns" row for non-Next.js projects.
+> Omit the "{Framework} Patterns" row when no framework agent was spawned (plain SPAs, static HTML).
 
 ---
 
@@ -760,7 +838,7 @@ Read `references/quality-gates.md` for the full scoring methodology. Key rules:
 1. Each category starts at 100
 2. Deduct per issue: CRITICAL -15, HIGH -8, MEDIUM -3 (max 10), LOW -1 (max 10)
 3. Floor at 0 (no negative scores)
-4. Overall score = weighted average based on framework type, rounded to nearest integer (half-up). Next.js: Technical 22%, Performance 22%, Next.js 18%, Meta 18%, Images 10%, AEO 10%. Non-Next.js: Technical 27%, Performance 27%, Meta 23%, Images 13%, AEO 10%.
+4. Overall score = weighted average based on whether a framework agent was spawned, rounded to nearest integer (half-up). With framework agent (Next.js, Nuxt, Gatsby, Astro): Technical 22%, Performance 22%, Framework Patterns 18%, Meta 18%, Images 10%, AEO 10%. Without framework agent (React, Vue, Angular, Svelte, static): Technical 27%, Performance 27%, Meta 23%, Images 13%, AEO 10%.
 5. Deduplicate cross-category issues before scoring (count deduction in owning category only). AEO owns: AI bot rules, entity properties, FAQPage/HowTo presence, question headings, semantic landmarks.
 6. If a category is incomplete, redistribute its weight proportionally across available categories
 7. Apply grade scale: A+ (95-100) through F (0-49)

@@ -26,7 +26,7 @@ The orchestrator provides these reference files in your agent prompt:
 
 **Boundary — AI Search Readiness (AEO)**: SSR/SSG scoring stays in Performance. The `web-seo-aeo` agent may cross-reference your SSR findings for AI crawlability context, but it does not re-score SSR/SSG issues. You are the sole owner of SSR/SSG deductions for Core Web Vitals impact.
 
-**Boundary — Next.js Performance Antipatterns**: Framework-specific performance antipatterns (excessive `'use client'` boundaries, layout fetch caching, barrel file re-exports, dynamic import misuse for above-fold components, provider nesting, heavy `_app.tsx` imports, icon library imports, `getServerSideProps` overuse) are owned by `web-seo-nextjs`. Do not duplicate those checks. You own general CWV patterns, bundle size, image optimization, and non-framework-specific performance issues.
+**Boundary — Framework Performance Antipatterns**: Framework-specific performance antipatterns (e.g., excessive `'use client'` boundaries, layout fetch caching, barrel file re-exports, dynamic import misuse for above-fold components, provider nesting, heavy `_app.tsx` imports, icon library imports, `getServerSideProps` overuse) are owned by `web-seo-framework`. Do not duplicate those checks. You own general CWV patterns, bundle size, image optimization, and non-framework-specific performance issues. When no framework agent is spawned (plain React, Vue, Angular, Svelte, static HTML), you also run the framework-specific performance checks provided in your `{{performanceChecks}}` list.
 
 ## Path Convention
 

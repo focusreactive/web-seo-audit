@@ -236,13 +236,13 @@ Example with URL: `/web-seo-audit cwv https://example.com` — code-level CWV an
 
 ## What it checks
 
-6 categories, 4 specialized agents running in parallel. Every command accepts an optional URL — add one to get live website analysis correlated with code findings:
+6 categories, 3-4 specialized agents running in parallel (framework agent only spawned for supported meta-frameworks). Checks are filtered by detected framework and version — agents only run relevant checks. Every command accepts an optional URL for live website analysis correlated with code findings:
 
 | Category                   | Checks                                                                                                                                                                               | With URL adds                          | Agent                 |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | --------------------- |
 | **Technical SEO**          | robots.txt, sitemap, canonical URLs, meta robots, URL structure, internal linking, security headers, mobile optimization, i18n                                                       | Live HTML verification                 | `web-seo-technical`   |
 | **Performance**            | LCP patterns, INP risk, CLS prevention, bundle size, font loading, third-party scripts, caching, compression                                                                        | CrUX field data + Lighthouse scores    | `web-seo-performance` |
-| **Next.js Patterns**       | Metadata API, Server/Client Components, data fetching, `next/image`, `next/link`, `next/font`, `next/script`, route config, `robots.ts`, `sitemap.ts`, OG image generation, Suspense | Response headers, rendering checks     | `web-seo-nextjs`      |
+| **{Framework} Patterns**   | Framework-specific checks (e.g., Next.js: Metadata API, Server/Client Components, `next/*` APIs; Nuxt: `useHead()`, `NuxtLink`; etc.)                                               | Response headers, rendering checks     | `web-seo-framework`   |
 | **Meta & Structured Data** | Title tags, meta descriptions, Open Graph, Twitter Cards, canonical URLs, JSON-LD validation (10 schema types)                                                                       | Rendered meta tag verification         | `web-seo-technical`   |
 | **Image Optimization**     | Format (WebP/AVIF), dimensions, lazy loading, alt attributes, responsive images, `priority` prop                                                                                     | Rendered image attribute checks        | `web-seo-performance` |
 | **AI Search Readiness**    | llms.txt, AI crawler management (8 bots), entity-optimized structured data, content structure for AI extraction, AI crawlability signals                                             | Live robots.txt, llms.txt, HTML checks | `web-seo-aeo`         |
@@ -251,11 +251,13 @@ Example with URL: `/web-seo-audit cwv https://example.com` — code-level CWV an
 
 | Framework                   | Support | Details                                                                   |
 | --------------------------- | ------- | ------------------------------------------------------------------------- |
-| **Next.js** (App Router)    | Full    | Dedicated agent, 12 check categories, metadata API, Server Components     |
+| **Next.js** (App Router)    | Full    | Dedicated agent, version-gated checks (13.2+ metadata, 15+ fetch defaults), Server Components |
 | **Next.js** (Pages Router)  | Full    | `getStaticProps`/`getServerSideProps`, `next/head`, `_document`, `_app`   |
-| **React**                   | Core    | Technical SEO + Performance + Meta + Images (no framework-specific agent) |
-| **Vue / Nuxt**              | Core    | Same core checks, framework-aware advice                                  |
-| **Astro / Gatsby / Svelte** | Core    | Same core checks, framework-aware advice                                  |
+| **Nuxt** 2.x / 3+          | Full    | Dedicated agent, `useHead()`, `NuxtLink`, `NuxtImg`, Nitro prerendering  |
+| **Gatsby** 3+ / 4+         | Full    | Dedicated agent, `gatsby-plugin-image`, Head API, GraphQL SEO             |
+| **Astro** 3+ / 4+          | Full    | Dedicated agent, island architecture, `<Image>`, content collections      |
+| **React**                   | Core    | Technical SEO + Performance + Meta + Images (no framework agent)          |
+| **Vue / Angular / Svelte**  | Core    | Same core checks, framework-aware advice                                  |
 | **Static HTML**             | Core    | All checks except framework-specific patterns                             |
 
 ## Scoring
@@ -304,15 +306,15 @@ See [`examples/sample-output.md`](examples/sample-output.md) for a full report.
 │ - Internal links │  │ - Third-party scripts│  │ - AI crawlability│
 └────────────────-─┘  └──────────────────────┘  └───────────────-──┘
          │
-         ▼ (Next.js projects only)
-┌─────────────-────┐
-│ web-seo-nextjs   │
-│ - Metadata API   │
-│ - Server/Client  │
-│ - Data fetching  │
-│ - next/* APIs    │
-│ - Route config   │
-└────────────────-─┘
+         ▼ (Next.js / Nuxt / Gatsby / Astro only)
+┌──────────────────────┐
+│ web-seo-framework    │
+│ - Framework APIs     │
+│ - Version-gated      │
+│ - Router-specific    │
+│ - Config analysis    │
+│ - Antipatterns       │
+└──────────────────────┘
 ```
 
 </details>
@@ -334,11 +336,12 @@ web-seo-audit/
 │           ├── nextjs-patterns.md# Next.js detection rules
 │           ├── schema-types.md  # JSON-LD validation
 │           ├── aeo-patterns.md  # AI search readiness patterns
-│           └── fix-classification.md # Fix cycle classification rules
+│           ├── fix-classification.md # Fix cycle classification rules
+│           └── framework-checks.md # Framework-conditional check registry
 ├── agents/
 │   ├── web-seo-technical.md     # Technical SEO agent
 │   ├── web-seo-performance.md   # Performance agent
-│   ├── web-seo-nextjs.md       # Next.js agent
+│   ├── web-seo-framework.md     # Framework-specific agent (Next.js/Nuxt/Gatsby/Astro)
 │   └── web-seo-aeo.md          # AI search readiness agent
 ├── examples/
 │   └── sample-output.md        # Example audit report

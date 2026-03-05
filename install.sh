@@ -45,9 +45,10 @@ for f in \
     "skills/web-seo-audit/references/schema-types.md" \
     "skills/web-seo-audit/references/aeo-patterns.md" \
     "skills/web-seo-audit/references/fix-classification.md" \
+    "skills/web-seo-audit/references/framework-checks.md" \
     "agents/web-seo-technical.md" \
     "agents/web-seo-performance.md" \
-    "agents/web-seo-nextjs.md" \
+    "agents/web-seo-framework.md" \
     "agents/web-seo-aeo.md"; do
     if [[ ! -f "$SOURCE_DIR/$f" ]]; then
         error "Missing source file: $f"
@@ -70,13 +71,14 @@ cp "$SOURCE_DIR/skills/web-seo-audit/references/nextjs-patterns.md" "$SKILL_DIR/
 cp "$SOURCE_DIR/skills/web-seo-audit/references/schema-types.md"    "$SKILL_DIR/references/schema-types.md"
 cp "$SOURCE_DIR/skills/web-seo-audit/references/aeo-patterns.md"   "$SKILL_DIR/references/aeo-patterns.md"
 cp "$SOURCE_DIR/skills/web-seo-audit/references/fix-classification.md" "$SKILL_DIR/references/fix-classification.md"
+cp "$SOURCE_DIR/skills/web-seo-audit/references/framework-checks.md" "$SKILL_DIR/references/framework-checks.md"
 
 # ─── Install agents ──────────────────────────────────────────────────
 info "Installing agents to $AGENT_DIR ..."
 mkdir -p "$AGENT_DIR"
 cp "$SOURCE_DIR/agents/web-seo-technical.md"   "$AGENT_DIR/web-seo-technical.md"
 cp "$SOURCE_DIR/agents/web-seo-performance.md" "$AGENT_DIR/web-seo-performance.md"
-cp "$SOURCE_DIR/agents/web-seo-nextjs.md"      "$AGENT_DIR/web-seo-nextjs.md"
+cp "$SOURCE_DIR/agents/web-seo-framework.md"   "$AGENT_DIR/web-seo-framework.md"
 cp "$SOURCE_DIR/agents/web-seo-aeo.md"        "$AGENT_DIR/web-seo-aeo.md"
 
 # ─── Verify installation ─────────────────────────────────────────────
@@ -90,9 +92,10 @@ for f in \
     "$SKILL_DIR/references/schema-types.md" \
     "$SKILL_DIR/references/aeo-patterns.md" \
     "$SKILL_DIR/references/fix-classification.md" \
+    "$SKILL_DIR/references/framework-checks.md" \
     "$AGENT_DIR/web-seo-technical.md" \
     "$AGENT_DIR/web-seo-performance.md" \
-    "$AGENT_DIR/web-seo-nextjs.md" \
+    "$AGENT_DIR/web-seo-framework.md" \
     "$AGENT_DIR/web-seo-aeo.md"; do
     if [[ ! -r "$f" ]]; then
         error "Verification failed: $f is missing or not readable"
@@ -112,7 +115,7 @@ success "Installed and verified successfully!"
 printf "\n"
 printf "  ${BOLD}Installed files:${RESET}\n"
 printf "  ${DIM}Skill${RESET}   %s/SKILL.md\n" "$SKILL_DIR"
-printf "  ${DIM}Refs${RESET}    %s/references/ (6 files)\n" "$SKILL_DIR"
+printf "  ${DIM}Refs${RESET}    %s/references/ (7 files)\n" "$SKILL_DIR"
 printf "  ${DIM}Agents${RESET}  %s/web-seo-*.md (4 files)\n" "$AGENT_DIR"
 printf "\n"
 printf "  ${BOLD}Usage:${RESET}\n"

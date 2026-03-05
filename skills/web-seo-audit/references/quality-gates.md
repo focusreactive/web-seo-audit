@@ -6,18 +6,18 @@ This reference defines the scoring methodology for tech SEO audits. Each audit p
 
 ## Weight Distribution
 
-### Next.js Projects
+### Projects With Framework Agent (Next.js, Nuxt, Gatsby, Astro)
 
 | Category | Weight | Agent |
 |----------|--------|-------|
 | Technical SEO | 22% | web-seo-technical |
 | Performance | 22% | web-seo-performance |
-| Next.js Patterns | 18% | web-seo-nextjs |
+| {Framework} Patterns | 18% | web-seo-framework |
 | Meta & Structured Data | 18% | web-seo-technical |
 | Image Optimization | 10% | web-seo-performance |
 | AI Search Readiness | 10% | web-seo-aeo |
 
-### Non-Next.js Projects
+### Projects Without Framework Agent (React, Vue, Angular, Svelte, static HTML)
 
 | Category | Weight | Agent |
 |----------|--------|-------|
@@ -64,11 +64,11 @@ Each category starts at 100. Issues deduct points based on priority:
 - Hash-based SPA routing (`/#/`) — search engines may not crawl fragment URLs
 - Missing About page (no trust signal for E-E-A-T)
 - Missing author information on YMYL content pages
-- Excessive `'use client'` boundaries (>60% client components) — Next.js
-- Layout-level `fetch()` without caching in App Router — Next.js
-- Dynamic imports for above-the-fold components (Hero, Header, Nav) — Next.js
-- \>5 nested Context Providers in root layout / `_app` — Next.js
-- Heavy library imports in `_app.tsx` (moment, lodash, MUI, antd) — Next.js Pages Router
+- Excessive `'use client'` boundaries (>60% client components) — Next.js v13+ App Router only
+- Layout-level `fetch()` without caching in App Router — Next.js v13+ App Router only
+- Dynamic imports for above-the-fold components (Hero, Header, Nav) — Next.js any version
+- \>5 nested Context Providers in root layout / `_app` — Next.js any version
+- Heavy library imports in `_app.tsx` (moment, lodash, MUI, antd) — Next.js Pages Router only
 
 **MEDIUM (-3 each, max 10)**
 - Title tag too long (> 60 chars) or too short (< 30 chars)
@@ -88,14 +88,14 @@ Each category starts at 100. Issues deduct points based on priority:
 - Missing Contact page or Privacy Policy
 - Missing author information on non-YMYL content pages
 - Excessively long URL paths (>100 characters)
-- Excessive `'use client'` boundaries (40-60% client components) — Next.js
-- Barrel file re-exports in index files imported by Server Components — Next.js
-- Client Component wrapping Server Components with only `{children}` — Next.js
-- \>10 dynamic imports project-wide — Next.js
-- 3-5 nested Context Providers in root layout / `_app` — Next.js
-- Large inline JSON data in page components — Next.js
-- Importing entire icon libraries instead of subpath imports — Next.js
-- `getServerSideProps` where `getStaticProps` + `revalidate` would suffice — Next.js Pages Router
+- Excessive `'use client'` boundaries (40-60% client components) — Next.js v13+ App Router only
+- Barrel file re-exports in index files imported by Server Components — Next.js v13+ App Router only
+- Client Component wrapping Server Components with only `{children}` — Next.js v13+ App Router only
+- \>10 dynamic imports project-wide — Next.js any version
+- 3-5 nested Context Providers in root layout / `_app` — Next.js any version
+- Large inline JSON data in page components — Next.js any version
+- Importing entire icon libraries instead of subpath imports — Next.js any version
+- `getServerSideProps` where `getStaticProps` + `revalidate` would suffice — Next.js Pages Router only
 
 **LOW (-1 each, max 10)**
 - Trailing slashes inconsistency
@@ -104,8 +104,8 @@ Each category starts at 100. Issues deduct points based on priority:
 - Suboptimal image compression
 - Missing `rel="noopener"` on external links
 - Breadcrumb markup could be added
-- Missing `React.memo` on expensive context consumers — Next.js
-- Unnecessary dynamic imports for tiny components — Next.js
+- Missing `React.memo` on expensive context consumers — Next.js any version
+- Unnecessary dynamic imports for tiny components — Next.js any version
 
 ### AEO-Specific Deduction Examples
 
@@ -268,7 +268,7 @@ When calculating, apply deduction caps for MEDIUM and LOW issues per category, n
 When the same issue appears in multiple categories (e.g., an image without alt text could be both Image Optimization and Meta & Structured Data):
 
 1. **Count the deduction in only one category** — the category that owns the issue per the agent boundary rules
-2. **Ownership priority**: Image issues → Image Optimization. Meta tag issues → Meta & Structured Data. Framework-specific issues → Next.js Patterns. AEO issues → AI Search Readiness. If ambiguous, assign to the category where the issue has the higher priority level.
+2. **Ownership priority**: Image issues → Image Optimization. Meta tag issues → Meta & Structured Data. Framework-specific issues → {Framework} Patterns. AEO issues → AI Search Readiness. If ambiguous, assign to the category where the issue has the higher priority level.
 3. **AEO ownership rules**: AI bot rules in robots.txt → AI Search Readiness (not Technical SEO). Entity properties (`sameAs`, `about`, `dateModified` freshness, `mainEntityOfPage`, `speakable`, `reviewedBy`, `@id`) → AI Search Readiness (not Meta & Structured Data). FAQPage/HowTo schema presence → AI Search Readiness. Question-format headings → AI Search Readiness. Semantic landmarks for AI extraction → AI Search Readiness. SSR/SSG scoring → Performance (AEO can cross-reference but not deduct).
 4. **Still mention the issue** in the other category's report for context, but mark it as "(scored under {owning category})" and do not deduct points for it there.
 
@@ -277,7 +277,7 @@ When the same issue appears in multiple categories (e.g., an image without alt t
 When a category has no data (agent failure or not applicable):
 - Exclude the category from the overall score calculation
 - Redistribute its weight proportionally across remaining categories
-- Example: If Next.js Patterns (18%) is unavailable, redistribute proportionally across the remaining 5 categories (total remaining = 82%): Technical SEO ~26.8%, Performance ~26.8%, Meta & Structured Data ~22.0%, Image Optimization ~12.2%, AI Search Readiness ~12.2%
+- Example: If {Framework} Patterns (18%) is unavailable, redistribute proportionally across the remaining 5 categories (total remaining = 82%): Technical SEO ~26.8%, Performance ~26.8%, Meta & Structured Data ~22.0%, Image Optimization ~12.2%, AI Search Readiness ~12.2%
 
 ## Report Summary Format
 
@@ -288,7 +288,7 @@ When a category has no data (agent failure or not applicable):
 |----------|-------|--------|--------|
 | Technical SEO | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | Performance | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
-| Next.js Patterns | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
+| {Framework} Patterns | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | Meta & Structured Data | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | Image Optimization | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
 | AI Search Readiness | {score}/100 | {status} | {critical}C {high}H {medium}M {low}L |
