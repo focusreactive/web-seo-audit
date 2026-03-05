@@ -42,7 +42,7 @@ Use the framework, version, and router information provided by the orchestrator.
 grep: "\"next\":|\"nuxt\":|\"gatsby\":|\"astro\":" package.json
 ```
 
-If the framework is not one you support (Next.js, Nuxt, Gatsby, Astro), report: "Framework agent not applicable for {framework}." and stop.
+If the framework is not one you support (Next.js, Nuxt, Gatsby, Astro), report: "Framework agent not applicable for {framework}." and stop. Note: Eleventy (11ty) projects use template-based SSG and are handled by the universal agents — this agent is not spawned for Eleventy.
 
 ### Step 1: Run Filtered Checks
 

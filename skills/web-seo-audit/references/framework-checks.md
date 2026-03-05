@@ -28,7 +28,8 @@ This reference defines which checks each agent should run based on the detected 
 | internal link quality | MEDIUM | No `href="#"`, `href=""`, or `javascript:` links |
 | redirect chains | HIGH/MEDIUM | Flag chains > 2 hops, loops are CRITICAL |
 | URL structure | MEDIUM | Route depth, URL length, trailing slash consistency |
-| error pages | MEDIUM | 404 and 500 error pages should exist |
+| 404 error page | MEDIUM | 404 page should exist in source |
+| 500 error page | LOW | For SSGs/static sites, 500 is handled by hosting platform — only flag as MEDIUM for server-rendered frameworks (Next.js, Nuxt, Express) |
 | E-E-A-T signals | HIGH/MEDIUM | About page, author info, contact/privacy pages |
 | JSON-LD structured data | HIGH | Content pages should have structured data |
 | JSON-LD validation | MEDIUM | Check @context, absolute URLs, required properties |
@@ -76,6 +77,25 @@ This reference defines which checks each agent should run based on the detected 
 | `@astrojs/sitemap` | any | HIGH | Must have sitemap integration |
 | Frontmatter meta fields | any | MEDIUM | Content pages should have title, description in frontmatter |
 | ViewTransitions API | 3+ | LOW | Check for proper view transition handling |
+
+#### Eleventy (11ty)
+
+| Check | Version | Priority | Description |
+|-------|---------|----------|-------------|
+| Meta tags in layouts | any | HIGH | Layout templates (`.njk`, `.liquid`, `.html`) must include `<title>` and `<meta name="description">` in `<head>` |
+| Canonical URLs | any | CRITICAL | Layouts must include `<link rel="canonical">` |
+| Nunjucks/Liquid template patterns | any | MEDIUM | Check for proper variable usage in meta tags (`{{ title }}`, `{{ description }}`) with fallbacks |
+| Permalink configuration | any | MEDIUM | Check `.eleventy.js` or `eleventy.config.js` for permalink patterns and trailing slash consistency |
+| Passthrough copy for static assets | any | LOW | Verify `addPassthroughCopy` for images, fonts, and static files |
+| Collection-based sitemap | any | HIGH | Site should generate sitemap from collections |
+| Pagination templates | any | MEDIUM | Paginated content should have `rel="next/prev"` |
+| Data cascade for SEO fields | any | MEDIUM | Global data files (`_data/`) should provide SEO defaults (site name, base URL) |
+
+**Template file patterns for Eleventy** (agents must search these in addition to standard patterns):
+- Layouts: `src/_layouts/**/*.njk`, `src/_includes/**/*.njk`, `_includes/**/*.njk`, `_layouts/**/*.njk`
+- Pages: `src/**/*.njk`, `src/**/*.md`, `src/**/*.html`
+- Data: `src/_data/**/*.{js,json}`, `_data/**/*.{js,json}`
+- Config: `.eleventy.js`, `eleventy.config.{js,mjs,cjs}`
 
 #### SPA Frameworks (React, Vue, Angular, Svelte)
 
@@ -180,6 +200,18 @@ This reference defines which checks each agent should run based on the detected 
 | `client:idle` for non-critical | any | MEDIUM | Non-critical interactivity should use `client:idle` |
 | Content Collections images | 3+ | MEDIUM | Content collection images should use image() schema |
 
+#### Eleventy (11ty)
+
+| Check | Version | Priority | Description |
+|-------|---------|----------|-------------|
+| Image shortcodes / transforms | any | MEDIUM | Check for `@11ty/eleventy-img` plugin or image optimization shortcodes |
+| Image dimensions in templates | any | HIGH | `<img>` tags in `.njk`/`.liquid` templates must have `width`/`height` |
+| Image alt in templates | any | HIGH | `<img>` tags must have `alt` attributes |
+| Inline JS/CSS in templates | any | MEDIUM | Check for large inline `<script>` or `<style>` blocks in layout heads |
+| Third-party script loading | any | MEDIUM | External scripts should use `defer` or `async` |
+| Font loading in layouts | any | MEDIUM | Check for `font-display: swap` and font preloading |
+| Static asset formats | any | MEDIUM | Check `public/` or passthrough directories for non-WebP/AVIF images |
+
 #### SPA Frameworks (React, Vue, Angular, Svelte)
 
 | Check | Framework | Priority | Description |
@@ -204,15 +236,15 @@ All AEO checks are universal — they apply regardless of framework. The framewo
 | `llms-full.txt` exists | LOW | Extended version for comprehensive AI context |
 | AI retrieval bot rules | CRITICAL | ChatGPT-User, PerplexityBot, ClaudeBot must not be blocked |
 | AI training bot management | LOW | GPTBot, Google-Extended, CCBot, Bytespider — note but don't penalize |
-| Organization `sameAs` | HIGH | Organization schema must have `sameAs` for entity verification |
-| Article `dateModified` | MEDIUM | Articles must have `dateModified` for freshness signals |
-| Entity `@id` | MEDIUM | Primary entities should have stable `@id` |
-| `mainEntityOfPage` | MEDIUM | Content pages should declare main entity |
+| Organization `sameAs` | MEDIUM | Organization schema should have `sameAs` for entity verification |
+| Article `dateModified` | MEDIUM | Articles should have `dateModified` for freshness signals |
+| Entity `@id` | LOW | Primary entities benefit from stable `@id` |
+| `mainEntityOfPage` | LOW | Content pages benefit from declaring main entity |
 | `speakable` markup | LOW | Content suitable for voice answers |
-| FAQPage schema | MEDIUM | Q&A content should have FAQPage schema |
-| HowTo schema | MEDIUM | Tutorial content should have HowTo schema |
+| FAQPage schema | LOW | Q&A content benefits from FAQPage schema |
+| HowTo schema | LOW | Tutorial content benefits from HowTo schema |
 | `<main>` landmark | MEDIUM | Pages must have `<main>` for content identification |
-| `<article>` wrapper | MEDIUM | Content pages should use `<article>` |
+| `<article>` wrapper | LOW | Content pages benefit from `<article>` wrapper |
 | Question-format headings | LOW | Content pages benefit from question headings |
 | Content behind JS interactions | MEDIUM | FAQ/content in tabs/accordions must be in initial DOM |
 | Author pages | LOW | Sites with articles should have dedicated author pages |
@@ -229,6 +261,7 @@ The AEO agent needs to know WHERE to look for patterns based on framework:
 | Nuxt | `public/robots.txt` or `server/routes/robots.txt.ts` | `public/llms.txt` or `server/routes/llms.txt.ts` | `useHead()` or `useSchemaOrg()` |
 | Gatsby | `static/robots.txt` or via plugin | `static/llms.txt` | `gatsby-plugin-react-helmet` or `<Helmet>` |
 | Astro | `public/robots.txt` or `src/pages/robots.txt.ts` | `public/llms.txt` or `src/pages/llms.txt.ts` | `<script type="application/ld+json">` in layouts/pages |
+| Eleventy | `src/robots.txt` or root `robots.txt` (passthrough) | `src/llms.txt` or root `llms.txt` | `<script type="application/ld+json">` in layouts/includes, JS data files |
 | SPA / Static | `public/robots.txt` | `public/llms.txt` | `<script type="application/ld+json">` in HTML |
 
 ---
@@ -245,6 +278,7 @@ This agent is spawned ONLY when a recognized framework is detected. It runs deep
 | Nuxt | Yes | Composables, auto-imports, Nitro, NuxtLink, NuxtImg |
 | Gatsby | Yes | GraphQL layer, plugin ecosystem, image pipeline |
 | Astro | Yes | Island architecture, content collections, integrations |
+| Eleventy | No | Template-based SSG — universal agents cover all checks with Eleventy-specific file patterns. No dedicated agent needed. |
 | React (no meta-framework) | No | Universal agents cover SPA checks |
 | Vue (no meta-framework) | No | Universal agents cover SPA checks |
 | Angular | No | Universal agents cover SPA checks |

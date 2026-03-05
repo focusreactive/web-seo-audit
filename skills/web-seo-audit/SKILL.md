@@ -26,6 +26,7 @@ grep: "\"gatsby\":" package.json
 grep: "\"astro\":" package.json
 grep: "\"svelte\":" package.json
 grep: "\"@angular/core\":" package.json
+grep: "\"@11ty/eleventy\":" package.json
 ```
 
 **Framework priority resolution** (when multiple detected, use this order):
@@ -33,8 +34,9 @@ grep: "\"@angular/core\":" package.json
 2. `nuxt` — if `"nuxt":` found
 3. `gatsby` — if `"gatsby":` found
 4. `astro` — if `"astro":` found
-5. `vue` / `svelte` / `angular` / `react` — generic SPA checks
-6. `other` — no framework dependencies found, treat as static HTML
+5. `eleventy` — if `"@11ty/eleventy":` found in dependencies or devDependencies
+6. `vue` / `svelte` / `angular` / `react` — generic SPA checks
+7. `other` — no framework dependencies found, treat as static HTML
 
 ### Step 2: Detect Version
 
@@ -46,12 +48,29 @@ grep: "\"next\": \"" package.json       → e.g., "14.2.3"
 grep: "\"nuxt\": \"" package.json       → e.g., "3.8.0"
 grep: "\"gatsby\": \"" package.json     → e.g., "5.12.0"
 grep: "\"astro\": \"" package.json      → e.g., "4.1.0"
+grep: "\"@11ty/eleventy\": \"" package.json → e.g., "3.0.0"
 
 # Parse major.minor from version string (strip ^, ~, >= prefixes)
 # Examples: "^14.2.3" → 14.2, "~3.8.0" → 3.8, ">=5.0.0" → 5.0
 ```
 
-### Step 3: Detect Router Type (Next.js only)
+### Step 3: Detect Template Engine (Eleventy only)
+
+```
+glob: src/**/*.njk           → Nunjucks
+glob: src/**/*.liquid         → Liquid
+glob: src/**/*.hbs            → Handlebars
+glob: src/**/*.md             → Markdown
+glob: src/**/*.html           → HTML
+# Also check root-level (no src/ prefix)
+glob: *.njk
+glob: _includes/**/*.njk
+glob: _layouts/**/*.njk
+```
+
+Record: `templateEngine` — nunjucks | liquid | handlebars | mixed | n/a (Eleventy only)
+
+### Step 3b: Detect Router Type (Next.js only)
 
 ```
 glob: app/**/page.{tsx,jsx,ts,js}     → App Router
@@ -71,7 +90,7 @@ glob: public/**/*
 ### Detection Result
 
 Record all of these — they drive check selection:
-- `framework`: next | nuxt | gatsby | astro | react | vue | svelte | angular | other
+- `framework`: next | nuxt | gatsby | astro | eleventy | react | vue | svelte | angular | other
 - `frameworkVersion`: parsed major.minor (e.g., 14.2) or n/a
 - `router`: app | pages | both | n/a (Next.js only)
 - `sourceRoot`: path prefix (see Source Root Detection)

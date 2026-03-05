@@ -36,6 +36,17 @@ The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src
 
 In this document, paths are written without prefix for readability. Always apply the sourceRoot prefix when running actual glob/grep commands.
 
+## Template Engine Adaptation
+
+The orchestrator provides the detected framework. When the framework is **Eleventy (11ty)** or another template-based SSG, adapt ALL grep/glob patterns to search the correct file extensions:
+
+- **Eleventy**: Search `**/*.njk`, `**/*.liquid`, `**/*.hbs`, `**/*.html`, `**/*.md` in addition to standard patterns
+- Structured data: Check `_includes/**/*.njk`, `_layouts/**/*.njk` for `<script type="application/ld+json">` blocks and JS helper files
+- Robots/llms.txt: Check `src/robots.txt`, `src/llms.txt`, or root-level passthrough files
+- Content files: `**/*.md` with front matter (may contain structured data or SEO fields)
+
+**Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
+
 ## Analysis Protocol
 
 ### Step 1: Project Discovery
@@ -109,10 +120,10 @@ grep "\"@id\"" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx} pages/**/*.{tsx,jsx}
 ```
 
 **Rules**:
-- HIGH: Organization schema missing `sameAs` (AI can't verify entity identity)
+- MEDIUM: Organization schema missing `sameAs` (AI can't verify entity identity)
 - MEDIUM: Articles missing `dateModified` (AI deprioritizes undated content)
-- MEDIUM: Missing `mainEntityOfPage` on content pages
-- MEDIUM: No `@id` on primary entities (prevents cross-page entity resolution)
+- LOW: Missing `mainEntityOfPage` on content pages
+- LOW: No `@id` on primary entities (prevents cross-page entity resolution)
 - LOW: Missing `speakable` markup (opportunity for voice/AI audio answers)
 - LOW: Missing `author.url` or `author.sameAs` on articles
 
@@ -123,8 +134,8 @@ grep "HowTo" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx} pages/**/*.{tsx,jsx}
 ```
 
 **Rules**:
-- MEDIUM: Pages with Q&A content patterns but no FAQPage schema
-- MEDIUM: Tutorial/step-by-step pages but no HowTo schema
+- LOW: Pages with Q&A content patterns but no FAQPage schema
+- LOW: Tutorial/step-by-step pages but no HowTo schema
 - LOW: FAQPage with fewer than 2 questions
 
 **Check @id consistency**:
@@ -141,7 +152,7 @@ grep "<main|<article|<section|<aside" app/**/*.{tsx,jsx} components/**/*.{tsx,js
 
 **Rules**:
 - MEDIUM: No `<main>` element found (AI can't identify primary content area)
-- MEDIUM: Content pages without `<article>` wrapper
+- LOW: Content pages without `<article>` wrapper
 - LOW: Sections without headings (AI can't determine section topics)
 
 **Question-format headings**:

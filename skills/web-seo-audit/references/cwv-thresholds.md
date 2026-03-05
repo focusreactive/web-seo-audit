@@ -325,7 +325,7 @@ When analyzing code (not live metrics), use these heuristics to estimate CWV ris
 - `<img>` without `width`/`height` → HIGH risk
 - Dynamic content injection without reserved space → HIGH risk
 - Web fonts without `font-display` or `next/font` → MEDIUM risk
-- CSS animations using `top`/`left`/`width`/`height` → MEDIUM risk
+- CSS animations using `top`/`left`/`width`/`height` that run on page load without user interaction → MEDIUM risk (user-triggered transitions do NOT affect CLS — CLS excludes shifts within 500ms of user input)
 - No skeleton/loading states for async content → MEDIUM risk
 
 ---

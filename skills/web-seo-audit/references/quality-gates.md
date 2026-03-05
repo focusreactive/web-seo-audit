@@ -110,25 +110,25 @@ Each category starts at 100. Issues deduct points based on priority:
 ### AEO-Specific Deduction Examples
 
 **CRITICAL (-15 each)**
-- AI retrieval bots (ChatGPT-User, PerplexityBot, ClaudeBot) blocked via robots.txt
-- Blanket `Disallow: /` with no Allow rules for AI retrieval bots
+- AI retrieval bots (ChatGPT-User, PerplexityBot, ClaudeBot) explicitly blocked via robots.txt `Disallow: /`
+- Blanket `Disallow: /` under `User-agent: *` with no specific `Allow` rules for AI retrieval bots
 
 **HIGH (-8 each)**
 - No `llms.txt` file (AI systems can't discover structured site information)
-- Organization schema missing `sameAs` (AI can't verify entity identity)
 
 **MEDIUM (-3 each, max 10)**
+- Organization schema missing `sameAs` (AI can't verify entity identity)
 - Articles missing `dateModified` (AI deprioritizes undated content)
-- No `@id` on primary structured data entities
-- Missing `mainEntityOfPage` on content pages
 - No `<main>` element (AI can't identify primary content area)
-- Content pages without `<article>` wrapper
 - FAQ content behind JavaScript interactions (not in initial DOM)
-- Q&A content without FAQPage schema
-- Tutorial pages without HowTo schema
-- No explicit AI bot rules in robots.txt
+- No explicit AI bot rules in robots.txt (relying on defaults)
 
 **LOW (-1 each, max 10)**
+- No `@id` on primary structured data entities
+- Missing `mainEntityOfPage` on content pages
+- Content pages without `<article>` wrapper
+- Q&A content without FAQPage schema
+- Tutorial/process pages without HowTo schema
 - Missing `speakable` markup
 - Missing `author.url` or `author.sameAs` on articles
 - No question-format headings on content pages
@@ -165,9 +165,23 @@ Each category starts at 100. Issues deduct points based on priority:
 
 Before classifying an issue as CRITICAL or HIGH, answer these three questions. If any answer is "no", downgrade the severity.
 
-1. **Is the problem actually present?** Check whether the concern is already handled through an alternative mechanism (e.g., hreflang in `<head>` instead of sitemap, SSR via a different pattern, meta tags via a plugin). A missing implementation in one place is not a problem if it is correctly implemented elsewhere.
+1. **Is the problem actually present?** Check whether the concern is already handled through an alternative mechanism (e.g., hreflang in `<head>` instead of sitemap, SSR via a different pattern, meta tags via a plugin, error pages at the hosting platform level, security headers in `vercel.json`/`netlify.toml`). A missing implementation in one place is not a problem if it is correctly implemented elsewhere. For static sites / SSGs, many concerns (error pages, security headers, redirects) are handled by the hosting platform, not in source code.
 2. **Is the impact real at this severity level?** CRITICAL means indexing is blocked or CWV fails "poor." HIGH means rankings are directly harmed. Can you point to the specific mechanism that causes this level of impact? If you are estimating or guessing, downgrade to MEDIUM.
 3. **Does the fix make things better, not worse?** Verify the recommended fix does not contradict another best practice or introduce a new issue. If it does, either find a correct fix or do not report the finding.
+
+### CMS Content vs Code Issues
+
+When the project uses a headless CMS (Sanity, Contentful, DatoCMS, Storyblok, Prismic, etc.), many SEO issues originate from CMS content rather than code. Apply these rules:
+
+1. **Identify the root cause**: Is the issue in the template/code (missing fallback, broken logic) or in CMS-entered content (duplicate title, empty description, wrong text)?
+2. **CMS content issues** (duplicate titles entered by editors, empty pages, mismatched metadata):
+   - Cap severity at **MEDIUM** — these are editorial problems, not technical SEO failures
+   - Classify fixability as **manual** — cannot be fixed in code
+   - Label with "CMS content issue" in the problem description
+3. **Template/code issues** that EXPOSE CMS content problems (no fallback for empty fields, no uniqueness enforcement):
+   - Classify at normal severity — these ARE code bugs
+   - Example: "Title wrapped in conditional with no fallback" is a code issue (HIGH); "Homepage and About share identical title" is a CMS content issue (MEDIUM)
+4. **Do not double-count**: If a CMS content issue and its underlying template issue are both reported, score only the template issue. The CMS content issue is context, not a separate deduction.
 
 ### Classify as CRITICAL when:
 - The issue prevents search engines from crawling or indexing content
@@ -218,6 +232,7 @@ Every sub-point within an issue MUST have a **direct, proven causal relationship
 - `alt` attributes do NOT affect performance — they affect accessibility and image SEO.
 - `loading="lazy"` on below-fold images does NOT affect LCP — LCP measures the largest above-fold element.
 - Font `preload` does NOT affect CLS unless the font causes a visible size change on swap.
+- **CSS transitions triggered by user interaction** (`:hover`, `:focus`, `click`, `scroll`) do NOT cause CLS — the CLS metric excludes layout shifts that occur within 500ms of a user input event. Only flag transitions/animations that run automatically during page load (entrance animations, auto-play, mount effects). If you cannot confirm a transition runs without user interaction, do NOT report it as a CLS issue.
 
 **If in doubt, leave it out.** A clean finding with one accurate sub-point is better than a noisy finding with three where one is wrong.
 

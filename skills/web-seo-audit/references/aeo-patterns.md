@@ -246,9 +246,9 @@ grep "<main|<article|<section|<aside" app/**/*.{tsx,jsx} components/**/*.{tsx,js
 ```
 
 **Rules**:
-- Page should have exactly one `<main>` element
-- Content pages should use `<article>` for primary content
-- Sections should have associated headings
+- Page should have exactly one `<main>` element (MEDIUM if missing)
+- Content pages should use `<article>` for primary content (LOW if missing)
+- Sections should have associated headings (LOW if missing)
 - Missing all landmarks = content is in generic `<div>` soup (MEDIUM issue)
 
 ### Question-Format Headings

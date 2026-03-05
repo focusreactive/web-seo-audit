@@ -36,6 +36,17 @@ The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src
 
 In this document, paths are written without prefix for readability. Always apply the sourceRoot prefix when running actual glob/grep commands.
 
+## Template Engine Adaptation
+
+The orchestrator provides the detected framework. When the framework is **Eleventy (11ty)** or another template-based SSG, adapt ALL grep/glob patterns to search the correct file extensions:
+
+- **Eleventy**: Search `**/*.njk`, `**/*.liquid`, `**/*.hbs`, `**/*.html` in addition to standard patterns
+- Layout files: `_layouts/**/*.njk`, `_includes/**/*.njk`, `_includes/**/*.html`
+- CSS/JS: `**/*.css`, `**/*.js` (bundled assets, inline scripts)
+- Static assets: Check passthrough copy directories (often `src/static/`, `src/assets/`, `public/`)
+
+**Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
+
 ## Analysis Protocol
 
 ### Step 1: Project Discovery
@@ -128,8 +139,14 @@ grep: "web-vitals|@next/bundle-analyzer|lighthouse|crux-api" package.json
 
 **CSS Animation Concerns**
 - `grep "animation:|@keyframes" styles/**/*.css app/**/*.css`
+- `grep "transition:" styles/**/*.css app/**/*.css`
 - Flag animations using `top`, `left`, `width`, `height` (trigger layout)
 - Prefer `transform` and `opacity` animations
+- **IMPORTANT: Only flag transitions/animations that affect CLS** — this means transitions that run automatically during page load (e.g., entrance animations, auto-playing carousels, content that animates in on mount). User-triggered transitions (hover effects, click-to-expand, scroll-triggered with `IntersectionObserver`) do NOT cause CLS because CLS excludes layout shifts within 500ms of user input. Before flagging a CSS transition, verify:
+  1. The transition/animation is applied to an element that is present during initial page load
+  2. The transition runs without user interaction (auto-play, `animation` with no trigger, `onMount`)
+  3. The animated property actually causes layout shift (changes element size or position in the flow)
+  - If you cannot confirm all three, do NOT flag it as a CLS issue. It may still be a performance concern (layout thrashing) but classify it as INP risk, not CLS.
 
 ### Step 5: Bundle Size Analysis
 

@@ -20,6 +20,12 @@ The orchestrator provides these reference files in your agent prompt:
 - `quality-gates.md` — Scoring rules, deduction values, caps, output format
 - `schema-types.md` — JSON-LD schema type validation rules (10 types)
 
+**Boundary — CMS Content vs Code Issues**: When auditing sites that use a headless CMS (Sanity, Contentful, DatoCMS, Storyblok, etc.), distinguish between issues that are fixable in code (template bugs, missing fallbacks, structural problems) and issues that originate from CMS content (duplicate titles entered by editors, empty pages, wrong descriptions). CMS content issues:
+- Must be classified as `manual` fixability (cannot be auto-fixed in code)
+- Must be capped at MEDIUM severity — they are editorial problems, not technical SEO failures
+- Must include "CMS content issue" in the problem description so users know where to fix them
+- The exception is when the template lacks a fallback for missing CMS data — that IS a code issue (e.g., no default title when CMS title is empty)
+
 **Boundary — Image Optimization**: Image optimization (format, dimensions, alt attributes, lazy loading, responsive sizing) is owned by `web-seo-performance`. Do not report image-specific issues — only reference images when they affect crawlability (e.g., missing OG image URL in metadata) or structured data (e.g., ImageObject schema).
 
 **Boundary — AI Search Readiness (AEO)**: The following areas are owned by `web-seo-aeo` and must NOT be scored here:
@@ -35,6 +41,18 @@ The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src
 - If sourceRoot is empty: use `app/**/*.tsx`, `components/**/*.tsx`
 
 In this document, paths are written without prefix for readability. Always apply the sourceRoot prefix when running actual glob/grep commands.
+
+## Template Engine Adaptation
+
+The orchestrator provides the detected framework. When the framework is **Eleventy (11ty)** or another template-based SSG, adapt ALL grep/glob patterns to search the correct file extensions:
+
+- **Eleventy**: Search `**/*.njk`, `**/*.liquid`, `**/*.hbs`, `**/*.html`, `**/*.md`, `**/*.js` (data files) in addition to standard patterns
+- Layout files: `_layouts/**/*.njk`, `_includes/**/*.njk`, `_includes/**/*.html`
+- Page files: `**/*.njk`, `**/*.md`, `**/*.html` (with front matter)
+- Data files: `_data/**/*.{js,json}`, `**/*.11tydata.{js,json}`
+- Config: `.eleventy.js`, `eleventy.config.{js,mjs,cjs}`
+
+**Do NOT limit searches to `.tsx`, `.jsx` files** when the project uses a different template engine. Always include the template extensions for the detected framework.
 
 ## Analysis Protocol
 
@@ -190,6 +208,25 @@ Parse redirect configuration from all sources and build a redirect graph:
 **Status Code Checks**
 - Flag redirects using 302 (temporary) that should be 301 (permanent) — e.g., URL restructuring, domain changes (MEDIUM)
 - Verify `permanent: true` vs `permanent: false` in Next.js redirect config aligns with intent
+
+### Static Site / SSG Hosting Context
+
+For static site generators (Eleventy, Gatsby, Astro static output, Hugo, Jekyll) and statically-hosted projects, several checks need hosting-aware context:
+
+**Error Pages (404, 500)**:
+- Static sites typically handle error pages at the **hosting platform level** (Vercel, Netlify, Cloudflare Pages, AWS S3+CloudFront), not in source code
+- Check for: `404.html` or equivalent in the build output (most SSGs support this natively)
+- A missing `500.html` in source is **not** a code issue for static sites — the hosting platform handles server errors. Downgrade to LOW or omit entirely
+- Only flag missing 404 pages if no `404.html`, `404.njk`, `404.md`, or equivalent exists in the source
+
+**robots.txt**:
+- For Eleventy/Hugo/Jekyll: robots.txt may be a passthrough file in `src/`, `static/`, or root — not in `public/`
+- For monorepo or multi-deployment setups (e.g., separate blog subdirectory), each deployment may have its own robots.txt. Note which deployment's robots.txt you're analyzing
+
+**Security Headers**:
+- Static sites configure security headers via hosting platform (Vercel `vercel.json`, Netlify `_headers` or `netlify.toml`, Cloudflare `_headers`), not via application code
+- Check for hosting platform config files before flagging missing security headers
+- If no hosting config is found, note that headers should be configured at the hosting level rather than flagging as a code issue
 
 ### Step 7: Security Headers (Code-Level)
 
