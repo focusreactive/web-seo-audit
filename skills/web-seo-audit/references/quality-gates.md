@@ -46,7 +46,7 @@ Each category starts at 100. Issues deduct points based on priority:
 - Render-blocking resources preventing LCP under 4s
 - No HTTPS or mixed content on production
 - Missing viewport meta tag
-- JavaScript-only rendering with no SSR/SSG
+- JavaScript-only rendering with no SSR/SSG (does NOT apply to SSGs like Eleventy, Hugo, Gatsby, Astro — they are pre-rendered by definition)
 - Redirect loops (A→B→A or longer cycles) — blocks crawling entirely
 
 **HIGH (-8 each)**
@@ -168,6 +168,19 @@ Before classifying an issue as CRITICAL or HIGH, answer these three questions. I
 1. **Is the problem actually present?** Check whether the concern is already handled through an alternative mechanism (e.g., hreflang in `<head>` instead of sitemap, SSR via a different pattern, meta tags via a plugin, error pages at the hosting platform level, security headers in `vercel.json`/`netlify.toml`). A missing implementation in one place is not a problem if it is correctly implemented elsewhere. For static sites / SSGs, many concerns (error pages, security headers, redirects) are handled by the hosting platform, not in source code.
 2. **Is the impact real at this severity level?** CRITICAL means indexing is blocked or CWV fails "poor." HIGH means rankings are directly harmed. Can you point to the specific mechanism that causes this level of impact? If you are estimating or guessing, downgrade to MEDIUM.
 3. **Does the fix make things better, not worse?** Verify the recommended fix does not contradict another best practice or introduce a new issue. If it does, either find a correct fix or do not report the finding.
+
+### Environment Variable References
+
+When code uses `process.env.*`, `import.meta.env.*`, or similar environment variable patterns, do NOT assume the variable is missing or undefined. Environment variables are routinely set via:
+- Deployment platforms (Vercel, Netlify, Cloudflare Pages, AWS Amplify)
+- CI/CD pipelines
+- Docker / container orchestration
+- `.env` files excluded from version control (`.gitignore`)
+
+**Rules**:
+- Never classify a missing env var as CRITICAL based on code analysis alone — you cannot determine if the variable is set in the deployment environment
+- If code has no fallback for a critical env var: classify as MEDIUM, recommend adding a fallback, note "verify this is set in your deployment environment"
+- Only flag as HIGH if the code would produce broken output even WITH the env var set (e.g., string concatenation that produces an invalid URL structure)
 
 ### CMS Content vs Code Issues
 

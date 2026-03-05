@@ -20,6 +20,11 @@ The orchestrator provides these reference files in your agent prompt:
 - `quality-gates.md` — Scoring rules, deduction values, caps, output format
 - `schema-types.md` — JSON-LD schema type validation rules (10 types)
 
+**Boundary — Environment Variables**: When code references `process.env.*` variables, do NOT assume they are undefined at build/runtime. Environment variables are commonly set via deployment platforms (Vercel, Netlify, Cloudflare, AWS) rather than committed `.env` files. A missing `.env` file in the repo does NOT mean the variable is missing in production. For env var issues:
+- If the code has no fallback and the variable is critical (e.g., used in `og:image` URLs, API endpoints, canonical base URLs): classify as MEDIUM with fixability `confirm-fix`, and recommend adding a fallback — NOT as CRITICAL
+- Note: "Verify this variable is set in your deployment environment" rather than asserting it is broken
+- Only classify as CRITICAL if the code would produce visibly broken output even with the env var set (e.g., malformed URL construction)
+
 **Boundary — CMS Content vs Code Issues**: When auditing sites that use a headless CMS (Sanity, Contentful, DatoCMS, Storyblok, etc.), distinguish between issues that are fixable in code (template bugs, missing fallbacks, structural problems) and issues that originate from CMS content (duplicate titles entered by editors, empty pages, wrong descriptions). CMS content issues:
 - Must be classified as `manual` fixability (cannot be auto-fixed in code)
 - Must be capped at MEDIUM severity — they are editorial problems, not technical SEO failures

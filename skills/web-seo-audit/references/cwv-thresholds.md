@@ -307,8 +307,16 @@ These are not Core Web Vitals but affect overall performance scoring:
 
 When analyzing code (not live metrics), use these heuristics to estimate CWV risk:
 
+### SSG / JAMstack Baseline
+
+Static site generators (Eleventy, Hugo, Jekyll, Gatsby static, Astro static) serve pre-built HTML from CDN. This provides an inherent LCP advantage — content is in the HTML without server rendering or JS hydration. When assessing CWV risk for SSGs:
+- Do NOT flag "No SSR/SSG" — SSGs ARE pre-rendered by definition
+- Legacy JS libraries (jQuery, GSAP) affect INP but have lower LCP impact than on SPAs — downgrade severity unless render-blocking
+- Bundle size concerns are reduced — no hydration bundle. Focus on render-blocking scripts
+- Image optimization and CLS issues affect SSGs equally — do not downgrade these
+
 ### LCP Risk Indicators
-- No SSR/SSG for main content → HIGH risk
+- No SSR/SSG for main content → HIGH risk (does NOT apply to SSGs — they are pre-rendered)
 - Hero image without `priority` or `fetchpriority="high"` → MEDIUM risk
 - No image optimization (raw PNG/JPG, no srcset) → MEDIUM risk
 - Render-blocking scripts in `<head>` → HIGH risk

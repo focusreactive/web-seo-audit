@@ -36,6 +36,19 @@ The orchestrator provides a `sourceRoot` prefix in your agent prompt (e.g., `src
 
 In this document, paths are written without prefix for readability. Always apply the sourceRoot prefix when running actual glob/grep commands.
 
+## SSG / JAMstack Performance Context
+
+Static site generators (Eleventy, Gatsby, Astro static, Hugo, Jekyll) and JAMstack architectures have inherent performance advantages that must be factored into severity assessment:
+
+- **Pre-built HTML**: Pages are generated at build time and served as static files from CDN. There is no server-rendering overhead, no database queries, no framework hydration (unless the SSG adds client-side JS). This means TTFB is typically excellent and LCP for text-based content is fast.
+- **No JS framework tax**: Unlike React SPAs, static HTML pages don't need to download, parse, and execute a framework bundle before content is visible. The "Client-side rendering" CRITICAL check does NOT apply to SSGs — their content is already in the HTML.
+- **Severity adjustments for SSGs**:
+  - Legacy JS libraries (jQuery, GSAP) on a static site affect INP but have much less LCP impact than on a client-rendered SPA — downgrade from HIGH to MEDIUM unless the library is render-blocking
+  - Synchronous `<script>` tags in `<head>` still block parsing and are HIGH for LCP, but inline analytics/tracking scripts in `<body>` are MEDIUM at most
+  - Bundle size concerns are lower — there is no initial hydration bundle. Flag individual heavy scripts but do not flag "no code splitting" (SSGs serve per-page HTML, not SPA bundles)
+  - "No SSR/SSG" CRITICAL check must NOT fire for SSG projects — they ARE pre-rendered by definition
+- **Do NOT undercount real issues**: Image optimization (missing dimensions, no lazy loading, no modern formats) and render-blocking resources still matter equally on SSGs. CLS issues are framework-agnostic.
+
 ## Template Engine Adaptation
 
 The orchestrator provides the detected framework. When the framework is **Eleventy (11ty)** or another template-based SSG, adapt ALL grep/glob patterns to search the correct file extensions:
