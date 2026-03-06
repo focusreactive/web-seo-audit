@@ -301,6 +301,8 @@ Check configuration files for security-relevant settings:
 - Check for mixed content patterns (`http://` URLs in code)
 - `grep "http://" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx} styles/**/*.css`
 
+**Severity guidance**: Security headers are NOT a search engine ranking factor. Missing security headers should be classified as **LOW** (best practice, not SEO-impactful). Only mixed content (`http://` URLs on HTTPS pages) warrants MEDIUM, as it can cause browser warnings that affect user trust. Do not classify missing security headers as HIGH or CRITICAL in an SEO audit.
+
 ### Step 8: Internal Linking & Crawl Depth
 
 - Check for broken link patterns: `grep "href=\"#\"|href=\"\"|href=\"javascript:" **/*.{tsx,jsx}`

@@ -191,6 +191,17 @@ Before classifying an issue as CRITICAL or HIGH, answer these three questions. I
 2. **Is the impact real at this severity level?** CRITICAL means indexing is blocked or CWV fails "poor." HIGH means rankings are directly harmed. Can you point to the specific mechanism that causes this level of impact? If you are estimating or guessing, downgrade to MEDIUM.
 3. **Does the fix make things better, not worse?** Verify the recommended fix does not contradict another best practice or introduce a new issue. If it does, either find a correct fix or do not report the finding.
 
+### Hard Severity Caps (override agent judgment)
+
+The following checks have maximum severity caps because they do not directly affect search engine rankings. Agents MUST NOT exceed these caps regardless of their own assessment:
+
+| Check | Max Severity | Reason |
+|-------|-------------|--------|
+| Missing security headers (CSP, X-Frame-Options, HSTS, X-Content-Type-Options) | **LOW** | Not a ranking factor; purely a security best practice |
+| Missing `app/error.tsx` or error boundary | **MEDIUM** | Only impacts SEO if errors actually occur in production; a resilience measure |
+| Mixed content (`http://` URLs on HTTPS pages) | **MEDIUM** | Browser warnings affect user trust but don't block indexing |
+| Missing `Permissions-Policy` header | **LOW** | No SEO impact |
+
 ### Environment Variable References
 
 When code uses `process.env.*`, `import.meta.env.*`, or similar environment variable patterns, do NOT assume the variable is missing or undefined. Environment variables are routinely set via:
