@@ -1177,32 +1177,6 @@ Use this template for the full audit report:
 ### Long-term Improvements
 - {Architectural changes for sustained improvement}
 
----
-
-## Audit Summary (JSON)
-
-{Machine-readable summary for CI/CD integration. Output inside a fenced code block tagged `json`:}
-
-\`\`\`json
-{
-  "score": {overall_score},
-  "grade": "{grade}",
-  "status": "{PASS|WARNING|FAIL}",
-  "date": "{current date}",
-  "framework": "{framework}",
-  "frameworkVersion": "{version}",
-  "categories": {
-    "technical-seo": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
-    "performance": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
-    "framework-patterns": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
-    "meta-structured-data": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
-    "image-optimization": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } },
-    "ai-search-readiness": { "score": {n}, "status": "{status}", "issues": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n} } }
-  },
-  "cwvRisk": { "lcp": "{LOW|MEDIUM|HIGH}", "inp": "{LOW|MEDIUM|HIGH}", "cls": "{LOW|MEDIUM|HIGH}" },
-  "issueCount": { "critical": {n}, "high": {n}, "medium": {n}, "low": {n}, "total": {n} }
-}
-\`\`\`
 ```
 
 ### Issue Sort Order
