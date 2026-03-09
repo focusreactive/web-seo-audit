@@ -34,7 +34,10 @@ This reference defines which checks each agent should run based on the detected 
 | JSON-LD structured data | HIGH | Content pages should have structured data |
 | JSON-LD validation | MEDIUM | Check @context, absolute URLs, required properties |
 | pagination markup | MEDIUM | `rel="next/prev"` on paginated content |
-| hreflang / i18n | MEDIUM | Check if multi-language setup is correct |
+| hreflang / i18n | HIGH/MEDIUM | Validate hreflang bidirectional return links, self-references, x-default, language code format, URL consistency, and completeness across pages |
+| keyword cannibalization | MEDIUM | Flag pages targeting same primary keyword in title + H1 |
+| orphaned pages | HIGH | Pages with no incoming internal links from any other page |
+| internal link graph | MEDIUM | Key pages with few outlinks, deep-only pages |
 
 ### Framework-Specific Checks
 

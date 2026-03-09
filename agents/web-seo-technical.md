@@ -95,7 +95,10 @@ Before reporting a "missing X" issue, verify the feature is relevant to this pro
 | Missing author info | The site has blog/article/editorial content |
 | Multiple H1 elements | Confirmed on a single rendered page (not across different page files) |
 | Duplicate titles | Compare only leaf page metadata, not layout/template defaults |
-| Missing hreflang | Multi-language content is detected |
+| Missing hreflang | Multi-language content is detected (i18n library, locale route segments, or multiple language files) |
+| Hreflang validation (return links, self-ref, x-default) | Hreflang tags already exist — only validate if present |
+| Keyword cannibalization | At least 5 distinct content pages exist (not utility/auth pages) |
+| Orphaned pages | The site has >3 content pages and navigation/link components |
 | Missing 500 error page | Framework is server-rendered (not SSG/static) |
 
 If the feature is not applicable, omit the finding entirely — do not report it as LOW.
@@ -343,17 +346,57 @@ Detect pages that may have zero or minimal server-rendered content:
 
 ### Step 11: Internationalization (if applicable)
 
-- `grep "next-intl|next-i18next|react-intl|i18next|@formatjs|vue-i18n|@nuxtjs/i18n" package.json`
+**Detection — Multi-Language Setup**:
+- `grep "next-intl|next-i18next|react-intl|i18next|@formatjs|vue-i18n|@nuxtjs/i18n|astro-i18n|paraglide|typesafe-i18n" package.json`
 - `glob: app/[locale]/**/page.{tsx,jsx,ts,js}` or `glob: app/[lang]/**/page.{tsx,jsx,ts,js}`
 - `grep "middleware.*locale|i18n.*routing|locales" middleware.{ts,js}`
 - `grep "hreflang|i18n|locale" app/**/*.{tsx,jsx} next.config.{js,mjs,ts}`
 - Check for `lang` attribute on `<html>`
-- Verify hreflang tags if multiple languages exist
-- Check Next.js i18n configuration
+- Check Next.js/Nuxt i18n configuration
 
-**Hreflang cross-check** — hreflang annotations can be delivered via three equivalent mechanisms: `<link rel="alternate" hreflang="...">` in `<head>`, `metadata.alternates` in the metadata API, or `<xhtml:link>` in the sitemap. Google accepts any of these sources.
-- Before flagging missing or stubbed sitemap hreflang, check whether hreflang is already provided in page `<head>` tags or metadata exports. If it is, the sitemap hreflang is **redundant** — classify as LOW (best practice to have both) not HIGH.
-- Only flag missing hreflang as HIGH when **no hreflang exists in any source** (head, metadata, or sitemap) for a multi-language site.
+**Hreflang Delivery Mechanisms** — hreflang can be delivered via three equivalent sources. Google accepts any:
+1. `<link rel="alternate" hreflang="...">` in `<head>`
+2. `metadata.alternates` in the metadata API (Next.js App Router)
+3. `<xhtml:link>` in the sitemap XML
+
+Before flagging missing hreflang, check all three sources:
+- If hreflang is in `<head>` or metadata API but NOT in sitemap: classify as LOW (best practice to have both)
+- Only flag missing hreflang as HIGH when **no hreflang exists in any source** for a multi-language site
+
+**Hreflang Validation** — When hreflang tags are found, validate correctness:
+
+1. **Return links (bidirectional)**: Every hreflang annotation must have a corresponding return link. If page A declares `hreflang="fr"` pointing to page B, then page B MUST declare `hreflang="en"` pointing back to page A.
+   - `grep "hreflang" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+   - Read all hreflang declarations and build a directed graph of language↔URL mappings
+   - Flag missing return links as HIGH — search engines may ignore one-directional hreflang
+
+2. **Circular references**: Each page should reference itself with its own language code. If page A is English and declares hreflang for French and Spanish, it should also declare `hreflang="en"` pointing to itself.
+   - Flag missing self-referencing hreflang as MEDIUM
+
+3. **x-default**: Multi-language sites should include `hreflang="x-default"` pointing to the language selector or default page.
+   - `grep "x-default" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+   - Flag missing `x-default` as MEDIUM — helps search engines handle users with no language match
+
+4. **Language code format**: hreflang values must use ISO 639-1 language codes (e.g., `en`, `fr`, `de`) optionally with ISO 3166-1 region (e.g., `en-US`, `pt-BR`).
+   - Flag invalid language codes (e.g., `english`, `en_US` with underscore) as HIGH — search engines will ignore them
+   - Flag inconsistent formats across pages (some using `en`, others `en-US` for the same locale) as MEDIUM
+
+5. **URL consistency**: All hreflang URLs must be absolute, use the same protocol (https), and match canonical URLs.
+   - Flag relative hreflang URLs as HIGH
+   - Flag hreflang URLs that differ from canonical URLs (different domain, trailing slash mismatch) as MEDIUM
+
+6. **Completeness across pages**: If the site declares 5 languages on the homepage, verify other key pages also declare all 5 languages.
+   - Flag pages with incomplete language sets (e.g., homepage has 5 languages but /about only declares 2) as MEDIUM
+
+**Sitemap Hreflang Validation** — When `<xhtml:link>` hreflang is used in sitemap:
+- Read the sitemap XML and extract all `<xhtml:link>` elements
+- Apply the same bidirectional, self-referencing, and completeness checks
+- Flag sitemap-only hreflang (no `<head>` hreflang) as LOW — works but `<head>` is more reliable
+
+**Language-Specific Content** — Beyond hreflang tags:
+- `grep "lang=" app/**/*.{tsx,jsx} components/**/*.{tsx,jsx}` — check for `lang` attributes on content sections (e.g., `<blockquote lang="fr">`)
+- If a multi-language site serves translated content, verify the `<html lang>` attribute is dynamic (changes per locale), not hardcoded
+- Flag hardcoded `<html lang="en">` on a site with multiple locales as HIGH — tells search engines all pages are English
 
 ### Step 12: E-E-A-T Signals (Code-Level)
 
@@ -398,7 +441,7 @@ Check for accessibility patterns that directly affect SEO or CWV:
 
 ### Step 14: Content Quality Signals
 
-Static code analysis can detect certain content quality red flags. These are LOW/MEDIUM signals — not definitive content judgments.
+Static code analysis can detect certain content quality red flags. These range from LOW to HIGH signals depending on severity.
 
 **Thin content detection**:
 - Pages with very little static text content (JSX that renders only dynamic data with no static headings, descriptions, or explanatory text)
@@ -415,6 +458,28 @@ Static code analysis can detect certain content quality red flags. These are LOW
 - Check that each page file (or its layout) produces a logical heading hierarchy
 - Multiple H1 tags in the same page component tree: flag as MEDIUM
 - H3 without a preceding H2: flag as LOW (heading level skip)
+
+**Keyword cannibalization detection**:
+- Collect all page titles, meta descriptions, and H1 headings across pages
+- Build a map of primary topic keywords per page by extracting the core noun phrases from titles
+- Flag pages where two or more pages target the same primary keyword phrase in both title AND H1 as MEDIUM: "Potential keyword cannibalization: pages '{page1}' and '{page2}' both target '{keyword}' — search engines may split ranking signals between them"
+- Exclude layout/template inheritance (only compare leaf page content)
+- Exclude intentional patterns like paginated content (`/blog/page/2`) or locale variants
+- Only flag when confidence is HIGH (exact or near-exact match in both title and H1), not for incidental keyword overlap
+
+**Internal linking graph analysis**:
+- `grep "href=\"/|Link.*href=\"/|to=\"/" app/**/*.{tsx,jsx} pages/**/*.{tsx,jsx} components/**/*.{tsx,jsx}`
+- Build a directed graph of internal links between pages
+- **Orphaned pages**: Identify page routes that have no incoming internal links from any other page or navigation component. Flag as HIGH: "Orphaned page '{path}' has no internal links pointing to it — search engines may not discover it"
+  - Exclude utility pages (API routes, error pages, auth flows) from this check
+  - Check navigation components, footers, and sidebar components for links before flagging
+- **Hub pages with few outlinks**: If a key page (homepage, category page) has fewer than 3 internal links, flag as MEDIUM: "Key page '{path}' has very few outgoing internal links — consider adding links to distribute ranking authority"
+- **Deep-only pages**: Pages reachable only through 4+ clicks from the homepage (combine with crawl depth analysis in Step 8). Flag as MEDIUM when a page has internal links but all linking pages are themselves deep
+
+**Content-to-code ratio signals**:
+- For each page component, estimate the ratio of static text content vs boilerplate/UI code
+- Pages where >80% of the rendered JSX is navigation, footer, sidebar (shared layout) with <20% unique content: flag as LOW opportunity: "Page has low unique content ratio — consider adding more page-specific content"
+- Only check leaf page files, not layouts or shared components
 
 ### Step 15: Site Search & OpenSearch
 

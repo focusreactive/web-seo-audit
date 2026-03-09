@@ -86,6 +86,10 @@ If a page template has zero SEO setup (no title, no description, no OG, no struc
 - Hash-based SPA routing (`/#/`) — search engines may not crawl fragment URLs
 - Missing About page (no trust signal for E-E-A-T)
 - Missing author information on YMYL content pages
+- Orphaned page with no internal links pointing to it
+- Missing hreflang return links (bidirectional) on multi-language sites
+- Invalid hreflang language codes (e.g., `english` instead of `en`)
+- Relative hreflang URLs (must be absolute)
 - Excessive `'use client'` boundaries (>60% client components) — Next.js v13+ App Router only
 - Layout-level `fetch()` without caching in App Router — Next.js v13+ App Router only
 - Dynamic imports for above-the-fold components (Hero, Header, Nav) — Next.js any version
@@ -102,6 +106,13 @@ If a page template has zero SEO setup (no title, no description, no OG, no struc
 - Non-semantic heading hierarchy (skipping levels)
 - Multiple H1 elements on a single page
 - Duplicate meta descriptions across pages
+- Potential keyword cannibalization (multiple pages targeting same primary keyword in title + H1)
+- Missing hreflang self-reference on multi-language pages
+- Missing `hreflang="x-default"` on multi-language sites
+- Incomplete hreflang language set (some pages missing language variants)
+- Hreflang URL / canonical URL mismatch
+- Hardcoded `<html lang="en">` on multi-locale site
+- Key page with fewer than 3 outgoing internal links
 - 2-hop redirect chains (A→B→C) — consolidation recommended
 - Redirect using 302 (temporary) when 301 (permanent) is appropriate
 - Route depth > 3 path segments from root
@@ -126,6 +137,9 @@ If a page template has zero SEO setup (no title, no description, no OG, no struc
 - Suboptimal image compression
 - Missing `rel="noopener"` on external links
 - Breadcrumb markup could be added
+- Sitemap-only hreflang (no `<head>` hreflang) — works but `<head>` is more reliable
+- Page has low unique content ratio (mostly shared layout)
+- Hreflang in `<head>` but not in sitemap (redundancy best practice)
 - Missing `React.memo` on expensive context consumers — Next.js any version
 - Unnecessary dynamic imports for tiny components — Next.js any version
 

@@ -371,11 +371,11 @@ Run ONLY these checks (filtered for version {{frameworkVersion}}):
 
 **Framework patterns reference** is loaded based on detected framework:
 - Next.js → `references/nextjs-patterns.md`
-- Nuxt → (future: `references/nuxt-patterns.md`)
-- Gatsby → (future: `references/gatsby-patterns.md`)
-- Astro → (future: `references/astro-patterns.md`)
+- Nuxt → `references/nuxt-patterns.md`
+- Gatsby → `references/gatsby-patterns.md`
+- Astro → `references/astro-patterns.md`
 
-If no dedicated patterns reference exists for the framework (currently only Next.js has `nextjs-patterns.md`), include the framework's check table from `references/framework-checks.md` directly in the agent prompt, along with this instruction: "Use the check descriptions in the table as your detection rules. For each check, apply the standard Verification Protocol (read file context, trace imports, check for alternative implementations). Report findings with the same format and rigor as if a full patterns reference were available."
+Each framework has a dedicated patterns reference with detection rules, correct implementations, anti-patterns, and version gates. Load the matching file based on the detected framework.
 
 ### Template: aeo
 
@@ -521,26 +521,36 @@ Runs a comprehensive audit across all categories. This is the default command. W
    - Read `references/aeo-patterns.md` for AI search readiness reference
    - Read `references/output-schema.md` for agent output JSON contract
    - If framework has a dedicated patterns reference (e.g., Next.js → `references/nextjs-patterns.md`): read it
-5. Spawn agents **in parallel** using the Agent tool. Build each agent's prompt from its Prompt Template (see Prompt Templates above), filling in all `{{variable}}` placeholders with detected values, filtered check lists, and loaded reference content.
+5. Spawn agents **concurrently in a single message** using multiple Agent tool calls. Build each agent's prompt from its Prompt Template (see Prompt Templates above), filling in all `{{variable}}` placeholders with detected values, filtered check lists, and loaded reference content.
 
-   **All projects** (spawn 3 universal agents):
+   **IMPORTANT — Concurrent spawning**: All agents are independent and MUST be spawned in a single message with multiple parallel Agent tool calls (not sequentially). This cuts wall-clock time roughly in half. If a URL is provided, also include WebFetch and PSI curl calls in the same parallel batch.
+
+   **All projects** (spawn 3 universal agents concurrently):
    ```
    Agent: web-seo-technical   — Template: technical (with {{technicalChecks}} for this framework)
    Agent: web-seo-performance  — Template: performance (with {{performanceChecks}} for this framework)
    Agent: web-seo-aeo          — Template: aeo (with {{aeoChecks}} + {{aeoFilePaths}} for this framework)
    ```
 
-   **Projects with dedicated framework support** (spawn 4th agent):
+   **Projects with dedicated framework support** (spawn 4th agent in same parallel batch):
    Only when framework is `next`, `nuxt`, `gatsby`, or `astro` (see Spawn Conditions in `references/framework-checks.md`):
    ```
    Agent: web-seo-framework    — Template: framework (with {{frameworkChecks}} filtered by version)
    ```
    NOT spawned for plain React, Vue, Angular, Svelte, or static HTML projects.
 
-   **If URL provided** — run these in parallel with the agents:
+   **If URL provided** — include these in the same parallel batch as the agents:
    - **WebFetch** the URL for HTML analysis (meta tags, structured data, images, headings, AEO signals)
    - **PSI mobile** curl for CrUX field data + Lighthouse scores
    - **PSI desktop** curl for desktop Lighthouse scores
+
+   **Example** — For a Next.js project with URL, send ONE message containing 6 parallel tool calls:
+   1. Agent: web-seo-technical
+   2. Agent: web-seo-performance
+   3. Agent: web-seo-aeo
+   4. Agent: web-seo-framework
+   5. WebFetch: URL
+   6. Bash: PSI curl (mobile + desktop)
 
 5. Collect results from all agents and validate completeness (see Agent Result Validation)
 6. Deduplicate cross-category issues (see Agent Result Validation > Deduplication)
